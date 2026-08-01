@@ -44,7 +44,6 @@
       if (window.PixelAuth && typeof window.PixelAuth.getUser === 'function') {
         var u = window.PixelAuth.getUser();
         if (u && u.displayName) return u.displayName;
-        if (u && u.email) return String(u.email).split('@')[0];
       }
     } catch (e) {}
     try {

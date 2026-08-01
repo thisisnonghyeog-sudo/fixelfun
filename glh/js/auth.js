@@ -1,11 +1,23 @@
 /**
  * PixelFun 인증 모듈 (Auth)
- * - Supabase Auth가 설정돼 있으면 사용, 없으면 게스트 모드 폴백
+ * - 닉네임 + 비밀번호 로그인 / 회원가입 (Supabase Auth)
+ * - Supabase 미설정 시 게스트 모드로 폴백
  * - 헤더의 #loginBtn 자동 바인딩 + 로그인 모달 동적 생성
  * - 글로벌: window.PixelAuth
+ *
+ * ▸ 닉네임 → 내부 이메일 변환
+ *   Supabase Auth는 이메일(또는 전화번호)이 반드시 필요합니다.
+ *   그래서 닉네임을 SHA-256으로 해시해 `u<hash>@pixelfun.local` 이라는
+ *   내부 전용 주소를 만들어 씁니다. 사용자에게는 노출되지 않고 메일도 오가지 않습니다.
+ *   같은 닉네임 → 항상 같은 주소이므로 로그인 시 다시 계산해 찾아갑니다.
+ *   ⚠️ Supabase 대시보드에서 "Confirm email"을 반드시 꺼야 합니다 (SETUP.md 참고).
  */
 (function () {
   'use strict';
+
+  var EMAIL_DOMAIN = '@pixelfun.local';
+  var NICK_RE = /^[가-힣a-zA-Z0-9_]{2,12}$/;
+  var PW_MIN = 6;
 
   // localStorage 안전 래퍼
   var memStore = {};
@@ -21,19 +33,29 @@
     // 폴백 한국어
     var fb = {
       'auth.login': '로그인', 'auth.logout': '로그아웃', 'auth.signup': '회원가입',
-      'auth.email': '이메일', 'auth.password': '비밀번호',
-      'auth.googleLogin': '구글로 로그인', 'auth.guestStart': '게스트로 시작',
+      'auth.password': '비밀번호', 'auth.passwordConfirm': '비밀번호 확인',
+      'auth.guestStart': '게스트로 시작',
       'auth.nickname': '닉네임', 'auth.welcome': '환영합니다, {name}님!',
-      'auth.loginFailed': '로그인 실패', 'auth.guestModeOnly': '게스트 모드만 사용 가능합니다',
-      'auth.emailPlaceholder': '이메일을 입력하세요',
-      'auth.passwordPlaceholder': '비밀번호를 입력하세요 (6자 이상)',
-      'auth.nicknamePlaceholder': '닉네임 (회원가입/게스트 공용)',
+      'auth.loginFailed': '로그인 실패', 'auth.signupFailed': '회원가입 실패',
+      'auth.guestModeOnly': '게스트 모드만 사용 가능합니다',
+      'auth.passwordPlaceholder': '비밀번호 (6자 이상)',
+      'auth.passwordConfirmPlaceholder': '비밀번호를 한 번 더 입력하세요',
+      'auth.nicknamePlaceholder': '닉네임 (2~12자)',
       'auth.or': '또는', 'auth.close': '닫기',
+      'auth.checkDuplicate': '중복확인',
+      'auth.checking': '확인 중...',
+      'auth.nickAvailable': '사용 가능한 닉네임입니다',
+      'auth.nickTaken': '이미 사용 중인 닉네임입니다',
+      'auth.nickInvalid': '닉네임은 한글/영문/숫자/밑줄 2~12자여야 합니다',
+      'auth.nickCheckFailed': '중복 확인에 실패했습니다. 잠시 후 다시 시도해 주세요',
+      'auth.nickCheckRequired': '닉네임 중복확인을 먼저 해주세요',
+      'auth.pwTooShort': '비밀번호는 6자 이상이어야 합니다',
+      'auth.pwMismatch': '비밀번호가 일치하지 않습니다',
       'auth.signupSuccess': '회원가입 성공! 자동 로그인됩니다',
-      'auth.confirmEmail': '가입 확인 메일을 보냈습니다. 메일함을 확인해 주세요',
       'auth.logoutSuccess': '로그아웃되었습니다',
       'auth.guestWelcome': '게스트 모드로 시작합니다',
-      'auth.loading': '처리 중...'
+      'auth.loading': '처리 중...',
+      'auth.insecureContext': 'HTTPS 또는 localhost 에서만 로그인할 수 있습니다'
     };
     var s = fb[key] || key;
     if (vars) s = s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
@@ -49,17 +71,44 @@
   }
   function hasCloud() { return getClient() != null; }
 
+  // SHA-256은 보안 컨텍스트(HTTPS/localhost)에서만 제공됩니다.
+  function canHash() {
+    try {
+      return !!(window.crypto && window.crypto.subtle && typeof window.crypto.subtle.digest === 'function');
+    } catch (e) { return false; }
+  }
+  function cloudReady() { return hasCloud() && canHash(); }
+
+  // ===== 닉네임 처리 =====
+  function normalizeNick(nick) {
+    var s = String(nick == null ? '' : nick).trim();
+    try { s = s.normalize('NFC'); } catch (e) { /* 구형 브라우저 무시 */ }
+    return s;
+  }
+  function isValidNick(nick) {
+    return NICK_RE.test(normalizeNick(nick));
+  }
+
+  // 닉네임 → 내부 전용 이메일 (대소문자 무시, 결정적)
+  function emailForNick(nick) {
+    var norm = normalizeNick(nick).toLowerCase();
+    var bytes = new TextEncoder().encode(norm);
+    return window.crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
+      var hex = Array.prototype.map.call(new Uint8Array(buf), function (b) {
+        return ('0' + b.toString(16)).slice(-2);
+      }).join('');
+      // 이메일 local part 길이 제한(64자)을 넘지 않도록 앞 40자만 사용
+      return 'u' + hex.slice(0, 40) + EMAIL_DOMAIN;
+    });
+  }
+
   // Supabase user 객체 → 내부 표준 형태
   function toInfo(u) {
     if (!u) return null;
     var meta = u.user_metadata || {};
-    var name = meta.nickname || meta.full_name || meta.name ||
-               (u.email ? String(u.email).split('@')[0] : 'user');
     return {
       uid: u.id,
-      displayName: name,
-      email: u.email || '',
-      avatar: meta.avatar_url || '',
+      displayName: meta.nickname || 'user',
       isGuest: false
     };
   }
@@ -88,81 +137,105 @@
     } catch (e) { /* 무시 */ }
   }
 
-  // Supabase 에러 메시지 정리
+  // Supabase 에러 메시지 → 사용자용 한국어
   function errMsg(error) {
     if (!error) return '';
     var m = error.message || String(error);
-    if (/Invalid login credentials/i.test(m)) return '이메일 또는 비밀번호가 올바르지 않습니다';
-    if (/Email not confirmed/i.test(m)) return '이메일 인증이 완료되지 않았습니다';
-    if (/User already registered/i.test(m)) return '이미 가입된 이메일입니다';
-    if (/Password should be at least/i.test(m)) return '비밀번호는 6자 이상이어야 합니다';
-    if (/valid email/i.test(m)) return '올바른 이메일 형식이 아닙니다';
+    if (/Invalid login credentials/i.test(m)) return '닉네임 또는 비밀번호가 올바르지 않습니다';
+    if (/User already registered/i.test(m)) return tr('auth.nickTaken');
+    // 프로필 트리거의 unique 제약 위반은 GoTrue가 이 메시지로 감싸서 돌려줍니다.
+    if (/Database error saving new user/i.test(m)) return tr('auth.nickTaken');
+    if (/duplicate key|already exists/i.test(m)) return tr('auth.nickTaken');
+    if (/Password should be at least/i.test(m)) return tr('auth.pwTooShort');
+    if (/Email not confirmed/i.test(m)) {
+      return '이메일 확인 설정이 켜져 있습니다. Supabase → Authentication → Providers → Email 에서 "Confirm email"을 꺼주세요';
+    }
+    if (/signups? (are )?disabled/i.test(m)) return '회원가입이 비활성화되어 있습니다 (Supabase 설정 확인)';
     return m;
   }
 
-  // 이메일 로그인
-  function loginWithEmail(email, password) {
+  // ===== 닉네임 중복 확인 =====
+  // 반환: { ok: true|false, reason: 'available'|'taken'|'invalid'|'error'|'offline' }
+  function checkNickname(nick) {
+    if (!isValidNick(nick)) {
+      return Promise.resolve({ ok: false, reason: 'invalid' });
+    }
+    var sb = getClient();
+    if (!sb) return Promise.resolve({ ok: false, reason: 'offline' });
+
+    return sb.rpc('nickname_exists', { p_nick: normalizeNick(nick) })
+      .then(function (res) {
+        if (res.error) throw res.error;
+        return res.data
+          ? { ok: false, reason: 'taken' }
+          : { ok: true, reason: 'available' };
+      })
+      .catch(function (err) {
+        console.warn('[PixelFun] 닉네임 중복 확인 실패.', err && err.message);
+        return { ok: false, reason: 'error' };
+      });
+  }
+
+  // ===== 회원가입 =====
+  function signupWithNickname(nick, password) {
     var sb = getClient();
     if (!sb) return Promise.reject(new Error(tr('auth.guestModeOnly')));
-    return sb.auth.signInWithPassword({
-      email: String(email || '').trim(),
-      password: String(password || '')
+    if (!canHash()) return Promise.reject(new Error(tr('auth.insecureContext')));
+    if (!isValidNick(nick)) return Promise.reject(new Error(tr('auth.nickInvalid')));
+    if (String(password || '').length < PW_MIN) return Promise.reject(new Error(tr('auth.pwTooShort')));
+
+    var name = normalizeNick(nick);
+    return emailForNick(name).then(function (email) {
+      return sb.auth.signUp({
+        email: email,
+        password: String(password),
+        options: { data: { nickname: name } }
+      });
+    }).then(function (res) {
+      if (res.error) throw new Error(errMsg(res.error));
+      var data = res.data || {};
+      // Confirm email이 켜져 있으면 세션이 없습니다 → 이 방식에서는 확인 메일을 받을 수 없음
+      if (!data.session) {
+        throw new Error('Supabase의 "Confirm email" 설정을 꺼주세요. 닉네임 로그인은 실제 메일 주소를 쓰지 않습니다');
+      }
+      var info = toInfo(data.user);
+      if (info) {
+        lsSet('pixelfun_user', JSON.stringify(info));
+        lsSet('pixelfun_guest_name', info.displayName);
+        setUser(info);
+      }
+      return info;
+    });
+  }
+
+  // ===== 로그인 =====
+  function loginWithNickname(nick, password) {
+    var sb = getClient();
+    if (!sb) return Promise.reject(new Error(tr('auth.guestModeOnly')));
+    if (!canHash()) return Promise.reject(new Error(tr('auth.insecureContext')));
+    if (!normalizeNick(nick)) return Promise.reject(new Error(tr('auth.nickInvalid')));
+
+    return emailForNick(nick).then(function (email) {
+      return sb.auth.signInWithPassword({ email: email, password: String(password || '') });
     }).then(function (res) {
       if (res.error) throw new Error(errMsg(res.error));
       var info = toInfo(res.data && res.data.user);
       if (info) {
         lsSet('pixelfun_user', JSON.stringify(info));
+        lsSet('pixelfun_guest_name', info.displayName);
         setUser(info);
       }
       return info;
-    });
-  }
-
-  // 회원가입 (닉네임은 user_metadata.nickname 에 저장)
-  function signupWithEmail(email, password, nickname) {
-    var sb = getClient();
-    if (!sb) return Promise.reject(new Error(tr('auth.guestModeOnly')));
-    var nick = (nickname && String(nickname).trim()) || String(email || '').split('@')[0];
-    return sb.auth.signUp({
-      email: String(email || '').trim(),
-      password: String(password || ''),
-      options: { data: { nickname: nick } }
-    }).then(function (res) {
-      if (res.error) throw new Error(errMsg(res.error));
-      var data = res.data || {};
-      // 이메일 확인이 켜져 있으면 session이 null로 돌아옵니다.
-      if (!data.session) return { needsConfirm: true };
-      var info = toInfo(data.user);
-      if (info) {
-        lsSet('pixelfun_user', JSON.stringify(info));
-        setUser(info);
-      }
-      return info;
-    });
-  }
-
-  // 구글 로그인 (OAuth 리다이렉트 → 돌아오면 onAuthStateChange가 처리)
-  function loginWithGoogle() {
-    var sb = getClient();
-    if (!sb) return Promise.reject(new Error(tr('auth.guestModeOnly')));
-    var redirect = window.location.origin + window.location.pathname;
-    return sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: { redirectTo: redirect }
-    }).then(function (res) {
-      if (res.error) throw new Error(errMsg(res.error));
-      return null; // 페이지가 리다이렉트됩니다
     });
   }
 
   // 게스트 로그인 (즉시 처리)
   function loginAsGuest(nickname) {
     try {
-      var nick = (nickname && String(nickname).trim()) || 'Guest' + Math.floor(Math.random() * 1000);
+      var nick = normalizeNick(nickname) || 'Guest' + Math.floor(Math.random() * 1000);
       var info = {
         uid: 'guest_' + Date.now(),
         displayName: nick,
-        email: '',
         isGuest: true
       };
       lsSet('pixelfun_user', JSON.stringify(info));
@@ -215,14 +288,21 @@
         '.pa-modal h2{font-family:"Press Start 2P",monospace;font-size:14px;margin:0 0 18px;color:var(--neon-blue,#00d4ff);text-align:center;}',
         '.pa-modal input{width:100%;box-sizing:border-box;padding:10px 12px;margin:6px 0;background:var(--bg-main,#0a0a1a);border:1px solid #333;border-radius:8px;color:var(--text-primary,#fff);font-family:inherit;font-size:14px;transition:all .3s ease;}',
         '.pa-modal input:focus{outline:none;border-color:var(--neon-blue,#00d4ff);box-shadow:0 0 8px rgba(0,212,255,.4);}',
+        '.pa-tabs{display:flex;gap:6px;margin-bottom:14px;}',
+        '.pa-tab{flex:1;padding:9px 0;background:transparent;border:1px solid #333;border-radius:8px;color:var(--text-secondary,#a0a0b0);cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;transition:all .3s ease;}',
+        '.pa-tab.active{border-color:var(--neon-purple,#7b2ff7);color:var(--text-primary,#fff);background:rgba(123,47,247,.18);}',
+        '.pa-nick-row{display:flex;gap:6px;align-items:center;}',
+        '.pa-nick-row input{flex:1;}',
+        '.pa-check-btn{flex:0 0 auto;padding:10px 12px;white-space:nowrap;background:transparent;border:1px solid var(--neon-blue,#00d4ff);border-radius:8px;color:var(--neon-blue,#00d4ff);cursor:pointer;font-family:inherit;font-size:13px;transition:all .3s ease;}',
+        '.pa-check-btn:hover:not(:disabled){background:rgba(0,212,255,.12);}',
+        '.pa-check-btn:disabled{opacity:.5;cursor:not-allowed;}',
+        '.pa-hint{min-height:16px;margin:2px 0 4px;font-size:12px;color:var(--text-secondary,#a0a0b0);}',
+        '.pa-hint.ok{color:var(--neon-green,#00ff88);}',
+        '.pa-hint.bad{color:var(--neon-red,#ff4757);}',
         '.pa-btn{display:block;width:100%;padding:10px;margin:6px 0;border:none;border-radius:8px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;transition:all .3s ease;}',
-        '.pa-btn:disabled{opacity:.5;cursor:wait;}',
+        '.pa-btn:disabled{opacity:.5;cursor:not-allowed;}',
         '.pa-btn-primary{background:var(--neon-purple,#7b2ff7);color:#fff;}',
         '.pa-btn-primary:hover:not(:disabled){background:#9450ff;box-shadow:0 0 14px rgba(123,47,247,.6);}',
-        '.pa-btn-secondary{background:transparent;color:var(--neon-blue,#00d4ff);border:1px solid var(--neon-blue,#00d4ff);}',
-        '.pa-btn-secondary:hover:not(:disabled){background:rgba(0,212,255,.1);}',
-        '.pa-btn-google{background:#fff;color:#333;}',
-        '.pa-btn-google:hover:not(:disabled){background:#eee;}',
         '.pa-btn-guest{background:var(--neon-yellow,#ffd700);color:#0a0a1a;}',
         '.pa-btn-guest:hover:not(:disabled){background:#ffe44d;}',
         '.pa-divider{display:flex;align-items:center;margin:14px 0;color:var(--text-secondary,#a0a0b0);font-size:12px;}',
@@ -255,9 +335,13 @@
     } catch (e) { /* 무시 */ }
   }
 
-  // ===== 로그인 모달 =====
+  // ===== 로그인 / 회원가입 모달 =====
   function buildModal() {
     injectStyles();
+
+    var ready = cloudReady();
+    var mode = 'login'; // 'login' | 'signup'
+
     var bg = document.createElement('div');
     bg.className = 'pa-modal-bg';
     bg.id = 'paModal';
@@ -272,17 +356,55 @@
     closeBtn.addEventListener('click', closeModal);
 
     var h2 = document.createElement('h2');
-    h2.textContent = tr('auth.login');
+    h2.textContent = 'PixelFun';
 
-    var msg = document.createElement('div');
-    msg.className = 'pa-msg';
-    msg.id = 'paMsg';
+    // 탭
+    var tabs = document.createElement('div');
+    tabs.className = 'pa-tabs';
+    var loginTab = document.createElement('button');
+    loginTab.className = 'pa-tab active';
+    loginTab.textContent = tr('auth.login');
+    var signupTab = document.createElement('button');
+    signupTab.className = 'pa-tab';
+    signupTab.textContent = tr('auth.signup');
+    tabs.appendChild(loginTab);
+    tabs.appendChild(signupTab);
 
-    var emailIn = document.createElement('input');
-    emailIn.type = 'email';
-    emailIn.autocomplete = 'email';
-    emailIn.placeholder = tr('auth.emailPlaceholder');
-    emailIn.id = 'paEmail';
+    box.appendChild(closeBtn);
+    box.appendChild(h2);
+
+    if (!hasCloud()) {
+      var warn = document.createElement('div');
+      warn.className = 'pa-warn';
+      warn.textContent = tr('auth.guestModeOnly');
+      box.appendChild(warn);
+    } else if (!canHash()) {
+      var warn2 = document.createElement('div');
+      warn2.className = 'pa-warn';
+      warn2.textContent = tr('auth.insecureContext');
+      box.appendChild(warn2);
+    }
+
+    box.appendChild(tabs);
+
+    // ---- 닉네임 행 (입력 + 중복확인 버튼) ----
+    var nickRow = document.createElement('div');
+    nickRow.className = 'pa-nick-row';
+    var nickIn = document.createElement('input');
+    nickIn.type = 'text';
+    nickIn.maxLength = 12;
+    nickIn.autocomplete = 'username';
+    nickIn.placeholder = tr('auth.nicknamePlaceholder');
+    nickIn.id = 'paNick';
+    var checkBtn = document.createElement('button');
+    checkBtn.type = 'button';
+    checkBtn.className = 'pa-check-btn';
+    checkBtn.textContent = tr('auth.checkDuplicate');
+    nickRow.appendChild(nickIn);
+    nickRow.appendChild(checkBtn);
+
+    var hint = document.createElement('div');
+    hint.className = 'pa-hint';
 
     var pwIn = document.createElement('input');
     pwIn.type = 'password';
@@ -290,24 +412,19 @@
     pwIn.placeholder = tr('auth.passwordPlaceholder');
     pwIn.id = 'paPw';
 
-    var nickIn = document.createElement('input');
-    nickIn.type = 'text';
-    nickIn.maxLength = 20;
-    nickIn.placeholder = tr('auth.nicknamePlaceholder');
-    nickIn.id = 'paNick';
-    try { nickIn.value = lsGet('pixelfun_guest_name') || ''; } catch (e) { /* 무시 */ }
+    var pw2In = document.createElement('input');
+    pw2In.type = 'password';
+    pw2In.autocomplete = 'new-password';
+    pw2In.placeholder = tr('auth.passwordConfirmPlaceholder');
+    pw2In.id = 'paPw2';
 
-    var loginBtn = document.createElement('button');
-    loginBtn.className = 'pa-btn pa-btn-primary';
-    loginBtn.textContent = tr('auth.login');
+    var submitBtn = document.createElement('button');
+    submitBtn.className = 'pa-btn pa-btn-primary';
+    submitBtn.textContent = tr('auth.login');
 
-    var signupBtn = document.createElement('button');
-    signupBtn.className = 'pa-btn pa-btn-secondary';
-    signupBtn.textContent = tr('auth.signup');
-
-    var googleBtn = document.createElement('button');
-    googleBtn.className = 'pa-btn pa-btn-google';
-    googleBtn.textContent = tr('auth.googleLogin');
+    var msg = document.createElement('div');
+    msg.className = 'pa-msg';
+    msg.id = 'paMsg';
 
     var div = document.createElement('div');
     div.className = 'pa-divider';
@@ -319,93 +436,144 @@
     guestBtn.className = 'pa-btn pa-btn-guest';
     guestBtn.textContent = tr('auth.guestStart');
 
-    box.appendChild(closeBtn);
-    box.appendChild(h2);
-
-    var cloudOn = hasCloud();
-    if (!cloudOn) {
-      var warn = document.createElement('div');
-      warn.className = 'pa-warn';
-      warn.textContent = tr('auth.guestModeOnly');
-      box.appendChild(warn);
-      // Supabase 미설정 시 이메일/구글 버튼 비활성화
-      emailIn.disabled = true;
-      pwIn.disabled = true;
-      loginBtn.disabled = true;
-      signupBtn.disabled = true;
-      googleBtn.disabled = true;
-      [loginBtn, signupBtn, googleBtn].forEach(function (b) { b.style.opacity = '0.4'; b.style.cursor = 'not-allowed'; });
-    }
-
-    box.appendChild(emailIn);
+    box.appendChild(nickRow);
+    box.appendChild(hint);
     box.appendChild(pwIn);
-    box.appendChild(nickIn);
-    box.appendChild(loginBtn);
-    box.appendChild(signupBtn);
+    box.appendChild(pw2In);
+    box.appendChild(submitBtn);
     box.appendChild(msg);
-    box.appendChild(googleBtn);
     box.appendChild(div);
     box.appendChild(guestBtn);
-
     bg.appendChild(box);
 
-    // 이벤트 핸들러
+    // ---- 상태 ----
+    // 중복확인을 통과한 닉네임. 입력이 바뀌면 초기화됩니다.
+    var verifiedNick = null;
+    var checkTimer = null;
+
     function setMsg(text, ok) {
       msg.textContent = text || '';
       msg.className = 'pa-msg' + (ok ? ' ok' : '');
     }
-    function busy(on) {
-      [loginBtn, signupBtn, googleBtn].forEach(function (b) {
-        if (!cloudOn) return;
-        b.disabled = !!on;
-      });
-    }
-    function fail(err) {
-      busy(false);
-      setMsg(tr('auth.loginFailed') + ': ' + (err && err.message ? err.message : ''));
+    function setHint(text, kind) {
+      hint.textContent = text || '';
+      hint.className = 'pa-hint' + (kind ? ' ' + kind : '');
     }
 
-    loginBtn.addEventListener('click', function () {
+    function applyMode() {
+      var signup = (mode === 'signup');
+      loginTab.className = 'pa-tab' + (signup ? '' : ' active');
+      signupTab.className = 'pa-tab' + (signup ? ' active' : '');
+      checkBtn.style.display = signup ? '' : 'none';
+      hint.style.display = signup ? '' : 'none';
+      pw2In.style.display = signup ? '' : 'none';
+      pwIn.autocomplete = signup ? 'new-password' : 'current-password';
+      pwIn.placeholder = tr('auth.passwordPlaceholder');
+      submitBtn.textContent = signup ? tr('auth.signup') : tr('auth.login');
+      submitBtn.disabled = !ready;
+      checkBtn.disabled = !ready;
+      setMsg('');
+      setHint('');
+      verifiedNick = null;
+      nickIn.focus();
+    }
+
+    loginTab.addEventListener('click', function () { mode = 'login'; applyMode(); });
+    signupTab.addEventListener('click', function () { mode = 'signup'; applyMode(); });
+
+    // ---- 닉네임 중복 확인 ----
+    function runCheck() {
+      var nick = normalizeNick(nickIn.value);
+      verifiedNick = null;
+      if (!nick) { setHint(''); return Promise.resolve(false); }
+      if (!isValidNick(nick)) {
+        setHint(tr('auth.nickInvalid'), 'bad');
+        return Promise.resolve(false);
+      }
+      setHint(tr('auth.checking'));
+      checkBtn.disabled = true;
+      return checkNickname(nick).then(function (r) {
+        checkBtn.disabled = !ready;
+        // 확인하는 사이에 입력이 바뀌었으면 결과를 버립니다.
+        if (normalizeNick(nickIn.value) !== nick) return false;
+        if (r.ok) {
+          verifiedNick = nick;
+          setHint(tr('auth.nickAvailable'), 'ok');
+          return true;
+        }
+        if (r.reason === 'taken') setHint(tr('auth.nickTaken'), 'bad');
+        else if (r.reason === 'invalid') setHint(tr('auth.nickInvalid'), 'bad');
+        else setHint(tr('auth.nickCheckFailed'), 'bad');
+        return false;
+      });
+    }
+
+    checkBtn.addEventListener('click', function () { runCheck(); });
+
+    nickIn.addEventListener('input', function () {
+      verifiedNick = null;
+      if (mode !== 'signup') return;
+      setHint('');
+      if (checkTimer) clearTimeout(checkTimer);
+      // 입력을 멈추면 자동으로 한 번 확인해 줍니다.
+      checkTimer = setTimeout(function () { runCheck(); }, 600);
+    });
+
+    // ---- 제출 ----
+    function busy(on) {
+      submitBtn.disabled = !!on || !ready;
+      checkBtn.disabled = !!on || !ready;
+    }
+    function fail(prefixKey) {
+      return function (err) {
+        busy(false);
+        setMsg(tr(prefixKey) + ': ' + (err && err.message ? err.message : ''));
+      };
+    }
+
+    function doLogin() {
       setMsg(tr('auth.loading'), true);
       busy(true);
-      loginWithEmail(emailIn.value, pwIn.value)
+      loginWithNickname(nickIn.value, pwIn.value)
         .then(function () {
           busy(false);
           closeModal();
           showToast(tr('auth.welcome', { name: getUser() ? getUser().displayName : '' }));
         })
-        .catch(fail);
-    });
-    signupBtn.addEventListener('click', function () {
+        .catch(fail('auth.loginFailed'));
+    }
+
+    function doSignup() {
+      var nick = normalizeNick(nickIn.value);
+      if (!isValidNick(nick)) { setHint(tr('auth.nickInvalid'), 'bad'); return; }
+      if (pwIn.value.length < PW_MIN) { setMsg(tr('auth.pwTooShort')); return; }
+      if (pwIn.value !== pw2In.value) { setMsg(tr('auth.pwMismatch')); return; }
+      if (verifiedNick !== nick) { setMsg(tr('auth.nickCheckRequired')); runCheck(); return; }
+
       setMsg(tr('auth.loading'), true);
       busy(true);
-      signupWithEmail(emailIn.value, pwIn.value, nickIn.value)
-        .then(function (r) {
+      signupWithNickname(nick, pwIn.value)
+        .then(function () {
           busy(false);
-          if (r && r.needsConfirm) {
-            setMsg(tr('auth.confirmEmail'), true);
-            return;
-          }
           closeModal();
           showToast(tr('auth.signupSuccess'));
         })
-        .catch(fail);
+        .catch(fail('auth.signupFailed'));
+    }
+
+    submitBtn.addEventListener('click', function () {
+      if (mode === 'signup') doSignup(); else doLogin();
     });
-    googleBtn.addEventListener('click', function () {
-      setMsg(tr('auth.loading'), true);
-      busy(true);
-      loginWithGoogle().catch(fail);
+
+    [nickIn, pwIn, pw2In].forEach(function (el) {
+      el.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !submitBtn.disabled) submitBtn.click();
+      });
     });
+
     guestBtn.addEventListener('click', function () {
       var info = loginAsGuest(nickIn.value);
       if (info) closeModal();
-    });
-
-    // Enter 키로 로그인
-    [emailIn, pwIn].forEach(function (el) {
-      el.addEventListener('keydown', function (e) {
-        if (e.key === 'Enter' && !loginBtn.disabled) loginBtn.click();
-      });
     });
 
     // 배경 클릭 시 닫기
@@ -413,6 +581,7 @@
       if (e.target === bg) closeModal();
     });
 
+    applyMode();
     return bg;
   }
 
@@ -421,6 +590,8 @@
       closeModal();
       var modal = buildModal();
       document.body.appendChild(modal);
+      var n = document.getElementById('paNick');
+      if (n) n.focus();
     } catch (e) { /* 무시 */ }
   }
   function closeModal() {
@@ -445,10 +616,10 @@
       dd.style.top = (rect.bottom + window.scrollY + 6) + 'px';
       dd.style.left = (rect.left + window.scrollX) + 'px';
 
-      if (currentUser && currentUser.email) {
+      if (currentUser) {
         var info = document.createElement('div');
         info.className = 'pa-dd-info';
-        info.textContent = currentUser.email;
+        info.textContent = currentUser.displayName + (currentUser.isGuest ? ' (게스트)' : '');
         dd.appendChild(info);
       }
 
@@ -504,7 +675,6 @@
     var sb = getClient();
     if (!sb) return;
     try {
-      // 기존 세션 복원 (OAuth 리다이렉트 복귀 포함)
       sb.auth.getSession().then(function (res) {
         var session = res && res.data ? res.data.session : null;
         if (session && session.user) {
@@ -549,17 +719,16 @@
 
   // 글로벌 노출
   window.PixelAuth = {
-    loginWithEmail: loginWithEmail,
-    signupWithEmail: signupWithEmail,
-    loginWithGoogle: loginWithGoogle,
+    loginWithNickname: loginWithNickname,
+    signupWithNickname: signupWithNickname,
+    checkNickname: checkNickname,
+    isValidNick: isValidNick,
     loginAsGuest: loginAsGuest,
     logout: logout,
     getUser: getUser,
     onChange: onChange,
     openModal: openModal,
     closeModal: closeModal,
-    hasCloud: hasCloud,
-    // 하위 호환 (기존 코드가 hasFirebase를 참조할 수 있음)
-    hasFirebase: hasCloud
+    hasCloud: hasCloud
   };
 })();

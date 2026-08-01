@@ -11,12 +11,17 @@
 2. 대시보드 왼쪽 **SQL Editor** → **New query**
 3. [`supabase/schema.sql`](supabase/schema.sql) 파일 내용을 통째로 붙여넣고 **Run**
 
-만들어지는 테이블은 2개입니다.
+만들어지는 테이블은 3개입니다.
 
 | 테이블 | 저장 내용 | 접근 권한 (RLS) |
 |---|---|---|
 | `rankings` | 게임별 리더보드 기록 (게임, 이름, 점수, 시각) | 읽기: 전체 공개 / 쓰기: 등록만 가능, 수정·삭제 불가 |
 | `user_data` | 로그인 사용자의 통계·배지·최고기록 (jsonb) | 본인 것만 읽기/쓰기 |
+| `profiles` | 닉네임 ↔ 계정 매핑 (중복 방지) | 읽기: 전체 공개 / 쓰기: 가입 트리거만 |
+
+같이 만들어지는 것:
+- `handle_new_user()` 트리거 — 가입 시 `profiles` 행 자동 생성
+- `nickname_exists(text)` 함수 — 중복확인 버튼이 호출하는 RPC
 
 > 게스트도 랭킹 등록은 가능하지만(`user_id`가 비어 있는 행), 남의 계정 id를 사칭한 행은 DB가 거부합니다.
 
@@ -44,27 +49,37 @@ var SUPABASE_ANON_KEY = 'eyJhbGciOi...';
 
 ---
 
-## 3단계 · 로그인 방식 설정
+## 3단계 · 로그인 방식 설정 (⚠️ 필수)
 
-Supabase 대시보드 → **Authentication**
+Supabase 대시보드 → **Authentication → Providers → Email**
 
-### 이메일 로그인
-- **Providers → Email** 이 켜져 있으면 바로 사용 가능합니다.
-- 기본적으로 **가입 확인 메일**이 필요합니다. 테스트 중에 번거로우면
-  **Providers → Email → Confirm email** 을 꺼두면 가입 즉시 로그인됩니다.
+1. **Email** provider를 **켭니다**.
+2. **"Confirm email" 을 반드시 끕니다.** ← 이걸 안 끄면 회원가입이 실패합니다.
 
-### 구글 로그인
-1. **Providers → Google** 을 켜고, Google Cloud Console에서 발급한
-   Client ID / Client Secret 을 입력합니다.
-2. Google Cloud Console의 **승인된 리디렉션 URI**에 Supabase가 알려주는
-   `https://xxxx.supabase.co/auth/v1/callback` 을 등록합니다.
-3. Supabase → **Authentication → URL Configuration** 에서
-   - **Site URL**: 배포된 사이트 주소
-   - **Redirect URLs**: 배포 주소 + 로컬 테스트 주소(`http://localhost:5500` 등)
+### 왜 꺼야 하나요?
 
-구글 설정을 안 해도 이메일 로그인과 게스트 모드는 정상 동작합니다.
+이 사이트는 **닉네임 + 비밀번호**로만 로그인합니다. 그런데 Supabase Auth는 내부적으로
+이메일이나 전화번호가 반드시 있어야 합니다. 그래서 닉네임을 SHA-256으로 해시해
+`u<해시40자>@pixelfun.local` 이라는 **내부 전용 주소**를 만들어 계정에 붙입니다.
 
----
+- 같은 닉네임 → 항상 같은 주소 → 로그인할 때 다시 계산해서 찾아갑니다
+- 사용자에게는 전혀 노출되지 않고, 실제로 메일이 오가지도 않습니다
+- 받을 수 없는 주소이므로 **확인 메일 기능을 켜두면 가입이 완료되지 않습니다**
+
+> 해시는 브라우저의 `crypto.subtle` API를 쓰기 때문에 **HTTPS 또는 localhost**에서만 동작합니다.
+> 그 외 환경에서는 로그인 버튼이 잠기고 안내 문구가 뜹니다. 배포된 사이트는 HTTPS이므로 문제없습니다.
+
+### 닉네임 규칙과 중복 확인
+
+- 한글 / 영문 / 숫자 / 밑줄, **2~12자**
+- 대소문자를 구분하지 않습니다 (`Player`와 `player`는 같은 닉네임)
+- 회원가입 탭에서 입력을 멈추면 자동으로 중복 검사하고, **중복확인** 버튼으로 직접 확인할 수도 있습니다
+- 확인을 통과한 뒤 다른 사람이 먼저 가입해버리는 경쟁 상태는
+  `profiles` 테이블의 `lower(nickname)` unique 인덱스가 막습니다.
+  이 경우 가입 트랜잭션 전체가 롤백되어 중복 계정이 생기지 않습니다.
+
+> 비밀번호 찾기는 없습니다. 메일 주소를 받지 않으므로 재설정 메일을 보낼 수 없습니다.
+> 나중에 필요해지면 이메일 입력을 선택 항목으로 추가하면 됩니다.
 
 ## 배포
 
@@ -82,7 +97,7 @@ Settings → Pages → Source를 `main` 브랜치 `/ (root)`로 두면
 주소를 깔끔하게 하려면 `glh/` 안의 파일들을 저장소 루트로 옮기면 됩니다.
 
 ### 로컬 테스트
-`file://` 로 열면 `lang/*.json` fetch와 OAuth 리다이렉트가 막힙니다. 반드시 로컬 서버로 여세요.
+`file://` 로 열면 `lang/*.json` fetch와 `crypto.subtle`(로그인 해시)이 막힙니다. 반드시 로컬 서버로 여세요.
 
 ```bash
 cd glh
@@ -98,7 +113,7 @@ python -m http.server 5500
 |---|---|---|
 | Supabase 미설정 | localStorage | localStorage |
 | 설정됨 + 게스트 | Supabase `rankings` (익명 등록) | localStorage |
-| 설정됨 + 로그인 | Supabase `rankings` (계정 연결) | localStorage + `user_data` 동기화 |
+| 설정됨 + 닉네임 로그인 | Supabase `rankings` (계정 연결) | localStorage + `user_data` 동기화 |
 
 - 로그인하면 기존 로컬 기록과 서버 기록이 **병합**됩니다 (최고기록은 더 좋은 쪽, 배지는 합집합, 플레이 수는 큰 쪽).
 - 네트워크 오류가 나면 콘솔에 경고만 남기고 로컬에 저장한 뒤 계속 진행합니다. 게임이 멈추지 않습니다.
@@ -108,7 +123,7 @@ python -m http.server 5500
 | 파일 | 역할 |
 |---|---|
 | `js/supabase-config.js` | 클라이언트 초기화 (여기에 키 입력) |
-| `js/auth.js` | 이메일/구글/게스트 로그인, 로그인 모달 |
+| `js/auth.js` | 닉네임+비밀번호 로그인/회원가입, 중복확인, 게스트 모드 |
 | `js/ranking.js` | `rankings` 테이블 읽기/쓰기 + 리더보드 렌더링 |
 | `js/cloud-sync.js` | `user_data` 통계·배지 병합 동기화 |
-| `supabase/schema.sql` | 테이블 + RLS 정책 |
+| `supabase/schema.sql` | 테이블 + RLS 정책 + 닉네임 트리거/RPC |

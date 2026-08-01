@@ -35,24 +35,33 @@
     "login": "Login",
     "logout": "Logout",
     "signup": "Sign Up",
-    "email": "Email",
     "password": "Password",
-    "googleLogin": "Login with Google",
+    "passwordConfirm": "Confirm password",
     "guestStart": "Start as Guest",
     "nickname": "Nickname",
     "welcome": "Welcome, {name}!",
     "loginFailed": "Login failed",
+    "signupFailed": "Sign up failed",
     "guestModeOnly": "Guest mode only available",
-    "emailPlaceholder": "Enter your email",
-    "passwordPlaceholder": "Enter your password (6+ characters)",
-    "nicknamePlaceholder": "Nickname (for sign up / guest)",
+    "passwordPlaceholder": "Password (6+ characters)",
+    "passwordConfirmPlaceholder": "Re-enter your password",
+    "nicknamePlaceholder": "Nickname (2-12 characters)",
     "or": "or",
     "close": "Close",
+    "checkDuplicate": "Check",
+    "checking": "Checking...",
+    "nickAvailable": "This nickname is available",
+    "nickTaken": "This nickname is already taken",
+    "nickInvalid": "Nickname must be 2-12 letters, digits or underscores",
+    "nickCheckFailed": "Could not check availability. Please try again",
+    "nickCheckRequired": "Please check nickname availability first",
+    "pwTooShort": "Password must be at least 6 characters",
+    "pwMismatch": "Passwords do not match",
     "signupSuccess": "Sign up successful! Logging in automatically",
-    "confirmEmail": "Confirmation email sent. Please check your inbox",
     "logoutSuccess": "Logged out successfully",
     "guestWelcome": "Starting in guest mode",
-    "loading": "Processing..."
+    "loading": "Processing...",
+    "insecureContext": "Login requires HTTPS or localhost"
   },
   "game": {
     "start": "Start Game",
@@ -68,14 +77,38 @@
     "gameOver": "Game Over"
   },
   "games": {
-    "number": { "name": "Number Guess", "desc": "Guess a number between 1 and 100" },
-    "memory": { "name": "Memory Cards", "desc": "Find matching card pairs" },
-    "typing": { "name": "Typing Game", "desc": "Type fast for 60 seconds" },
-    "math": { "name": "Math Challenge", "desc": "Solve math in 60 seconds" },
-    "quiz": { "name": "OX Quiz", "desc": "True or false trivia" },
-    "color": { "name": "Color Match", "desc": "Stroop effect challenge" },
-    "chess": { "name": "Chess", "desc": "Play vs AI, win by checkmate" },
-    "tictactoe": { "name": "Tic-Tac-Toe", "desc": "Three in a row vs AI, build win streaks" }
+    "number": {
+      "name": "Number Guess",
+      "desc": "Guess a number between 1 and 100"
+    },
+    "memory": {
+      "name": "Memory Cards",
+      "desc": "Find matching card pairs"
+    },
+    "typing": {
+      "name": "Typing Game",
+      "desc": "Type fast for 60 seconds"
+    },
+    "math": {
+      "name": "Math Challenge",
+      "desc": "Solve math in 60 seconds"
+    },
+    "quiz": {
+      "name": "OX Quiz",
+      "desc": "True or false trivia"
+    },
+    "color": {
+      "name": "Color Match",
+      "desc": "Stroop effect challenge"
+    },
+    "chess": {
+      "name": "Chess",
+      "desc": "Play vs AI, win by checkmate"
+    },
+    "tictactoe": {
+      "name": "Tic-Tac-Toe",
+      "desc": "Three in a row vs AI, build win streaks"
+    }
   },
   "stats": {
     "title": "My Stats",

@@ -81,3 +81,76 @@ drop policy if exists "users delete own data" on public.user_data;
 create policy "users delete own data"
   on public.user_data for delete
   using (auth.uid() = user_id);
+
+
+-- ---------------------------------------------------------------------
+-- 3) profiles : 닉네임 ↔ 계정 매핑 (닉네임 중복 방지)
+--    로그인은 닉네임 + 비밀번호로 하고, Supabase Auth 내부적으로는
+--    닉네임을 해시한 내부 전용 주소(u<hash>@pixelfun.local)를 씁니다.
+-- ---------------------------------------------------------------------
+create table if not exists public.profiles (
+  id         uuid primary key references auth.users (id) on delete cascade,
+  nickname   text        not null,
+  created_at timestamptz not null default now(),
+
+  constraint profiles_nickname_len check (char_length(nickname) between 2 and 12)
+);
+
+-- 대소문자를 구분하지 않는 유일성 보장.
+-- 중복확인 버튼을 통과한 뒤 다른 사람이 먼저 가입해버리는 경쟁 상태도 여기서 막힙니다.
+create unique index if not exists profiles_nickname_unique_idx
+  on public.profiles (lower(nickname));
+
+alter table public.profiles enable row level security;
+
+-- 닉네임은 리더보드에 어차피 노출되므로 조회는 공개합니다.
+drop policy if exists "profiles are viewable by everyone" on public.profiles;
+create policy "profiles are viewable by everyone"
+  on public.profiles for select
+  using (true);
+
+-- 행 생성은 아래 트리거(security definer)만 담당합니다.
+-- INSERT/UPDATE/DELETE 정책이 없으므로 클라이언트는 닉네임을 조작할 수 없습니다.
+
+-- 회원가입 시 profiles 행 자동 생성.
+-- 닉네임이 중복이면 unique 인덱스 위반 → auth.users INSERT까지 롤백되어
+-- 가입 자체가 실패합니다 (중복 계정이 만들어지지 않음).
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.profiles (id, nickname)
+  values (
+    new.id,
+    coalesce(nullif(trim(new.raw_user_meta_data ->> 'nickname'), ''),
+             'user_' || left(new.id::text, 6))
+  );
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- 닉네임 중복 확인용 RPC.
+-- security definer 라서 profiles 전체를 노출하지 않고 true/false만 돌려줍니다.
+create or replace function public.nickname_exists(p_nick text)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles
+    where lower(nickname) = lower(trim(p_nick))
+  );
+$$;
+
+revoke all on function public.nickname_exists(text) from public;
+grant execute on function public.nickname_exists(text) to anon, authenticated;
