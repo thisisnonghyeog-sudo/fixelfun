@@ -342,6 +342,7 @@
   <script>
     (function () {
       // 각 게임 카드의 최고기록을 localStorage에서 읽어 표시
+      function refreshBests() {
       try {
         var nodes = document.querySelectorAll('.best-value[data-best-key]');
         nodes.forEach(function (el) {
@@ -363,6 +364,13 @@
         // localStorage 접근 실패 시 조용히 무시 (게스트 모드 폴백)
         console.warn('[PixelFun] 최고기록 로드 실패:', e);
       }
+      }
+
+      refreshBests();
+      // 로그인/로그아웃으로 프로필이 바뀌면 다시 그립니다 (cloud-sync.js가 호출)
+      window.pixelfunRefreshBests = refreshBests;
+      window.addEventListener('profileSwitched', refreshBests);
+      window.addEventListener('gameComplete', function () { setTimeout(refreshBests, 120); });
     })();
   </script>
 

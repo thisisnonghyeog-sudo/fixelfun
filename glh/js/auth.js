@@ -65,6 +65,23 @@
   var listeners = [];
   var currentUser = null;
 
+  // 저장된 세션 확인이 끝났음을 알리는 신호.
+  // cloud-sync.js가 프로필을 전환하기 전에 이걸 기다립니다.
+  // (기다리지 않으면 세션 복원 직전의 "로그아웃 상태"를 보고 잘못 전환합니다)
+  var readyResolve;
+  var readyPromise = new Promise(function (res) { readyResolve = res; });
+  var readyDone = false;
+  function markReady() {
+    if (readyDone) return;
+    readyDone = true;
+    try { readyResolve(currentUser); } catch (e) { /* 무시 */ }
+  }
+  function whenReady(cb) {
+    readyPromise.then(function () {
+      try { cb(currentUser); } catch (e) { /* 무시 */ }
+    });
+  }
+
   // Supabase 가용성 체크
   function getClient() {
     try { return window.sb || null; } catch (e) { return null; }
@@ -673,7 +690,7 @@
   // Supabase 세션 복원 + 상태 동기화
   function syncSupabase() {
     var sb = getClient();
-    if (!sb) return;
+    if (!sb) { markReady(); return; }
     try {
       sb.auth.getSession().then(function (res) {
         var session = res && res.data ? res.data.session : null;
@@ -682,7 +699,10 @@
           lsSet('pixelfun_user', JSON.stringify(info));
           setUser(info);
         }
-      }).catch(function () { /* 무시 */ });
+      }).catch(function () { /* 무시 */ })
+        .then(markReady);
+      // getSession이 응답하지 않아도 무한정 막히지 않도록 안전장치
+      setTimeout(markReady, 5000);
 
       sb.auth.onAuthStateChange(function (event, session) {
         try {
@@ -698,7 +718,7 @@
           }
         } catch (e) { /* 무시 */ }
       });
-    } catch (e) { /* 무시 */ }
+    } catch (e) { markReady(); }
   }
 
   function init() {
@@ -729,6 +749,8 @@
     onChange: onChange,
     openModal: openModal,
     closeModal: closeModal,
-    hasCloud: hasCloud
+    hasCloud: hasCloud,
+    ready: readyPromise,
+    whenReady: whenReady
   };
 })();

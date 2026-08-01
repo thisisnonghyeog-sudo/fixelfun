@@ -509,6 +509,8 @@
       try {
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem('pixelfun_record_count');
+        // 초기화한 상태를 서버에도 반영 (안 하면 다시 로그인할 때 되살아납니다)
+        try { if (window.PixelCloud) window.PixelCloud.persist(); } catch (e) {}
         var section = document.getElementById('badgeSection');
         if (section) renderInto('badgeSection');
       } catch (e) {}

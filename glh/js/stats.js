@@ -129,6 +129,8 @@
       var ok = window.confirm('정말 모든 통계를 초기화하시겠습니까?');
       if (!ok) return false;
       localStorage.removeItem(STORAGE_KEY);
+      // 초기화한 상태를 서버에도 반영 (안 하면 다시 로그인할 때 되살아납니다)
+      try { if (window.PixelCloud) window.PixelCloud.persist(); } catch (e) {}
       var section = document.getElementById('myStatsSection');
       if (section) renderInto('myStatsSection');
       return true;
