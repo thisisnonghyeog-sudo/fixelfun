@@ -23,6 +23,8 @@
   var TABLE = 'user_data';
   var SCOPE_KEY = 'pixelfun_active_scope';    // 현재 활성 프로필
   var CACHE_PREFIX = 'pixelfun_profile_';     // 프로필별 보관함
+  var GUEST_SCOPE = 'guest';
+  var SESSION_MARK = 'pixelfun_session';      // 브라우저 세션 식별용
 
   // 게임들이 실제로 읽고 쓰는 키 (= 프로필 전환 대상)
   var STATS_KEY = 'pixelfun_stats';
@@ -122,9 +124,56 @@
   }
 
   // ===== 프로필 보관함 =====
+  // 게스트 기록은 남기지 않습니다. 탭을 닫으면 사라지는 sessionStorage에만 두고,
+  // 새 세션으로 들어오면 이전 세션에 남은 찌꺼기를 지웁니다.
+  // (계정 기록은 기기에 남아야 하므로 localStorage를 계속 씁니다)
   function cacheKey(scope) { return CACHE_PREFIX + scope; }
-  function loadCache(scope) { return jsonGet(cacheKey(scope), null); }
-  function saveCache(scope, snap) { jsonSet(cacheKey(scope), snap); }
+  function isGuestScope(scope) { return scope === GUEST_SCOPE; }
+
+  // sessionStorage가 막힌 환경(일부 프라이버시 모드)에서는 메모리로 대체합니다.
+  // 페이지를 벗어나면 사라지므로 "게스트는 매번 초기화" 동작은 그대로 유지됩니다.
+  var ssMem = {};
+  function ssGet(k) {
+    try { return sessionStorage.getItem(k); } catch (e) { return (k in ssMem) ? ssMem[k] : null; }
+  }
+  function ssSet(k, v) {
+    try { sessionStorage.setItem(k, String(v)); } catch (e) { ssMem[k] = String(v); }
+  }
+  function ssRemove(k) {
+    try { sessionStorage.removeItem(k); } catch (e) { delete ssMem[k]; }
+  }
+
+  function loadCache(scope) {
+    if (isGuestScope(scope)) {
+      try {
+        var raw = ssGet(cacheKey(scope));
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) { return null; }
+    }
+    return jsonGet(cacheKey(scope), null);
+  }
+  function saveCache(scope, snap) {
+    if (isGuestScope(scope)) {
+      try { ssSet(cacheKey(scope), JSON.stringify(snap)); } catch (e) {}
+      return;
+    }
+    jsonSet(cacheKey(scope), snap);
+  }
+
+  // 새 브라우저 세션이면 지난 세션의 게스트 기록을 버립니다.
+  function startSession() {
+    if (ssGet(SESSION_MARK)) return false;   // 같은 세션 안에서의 페이지 이동
+    ssSet(SESSION_MARK, '1');
+
+    // 예전 버전이 localStorage에 남겨둔 게스트 보관함 정리
+    lsRemove(cacheKey(GUEST_SCOPE));
+
+    // 로그인 상태라면 그 계정 데이터이므로 건드리면 안 됩니다.
+    if (!isGuestScope(activeScope())) return false;
+
+    clearWorking();
+    return true;
+  }
 
   // ===== 병합 (같은 계정의 로컬 사본 ↔ 서버 기록) =====
   function betterScore(game, a, b) {
@@ -353,12 +402,18 @@
       }
       doomed.forEach(lsRemove);
     } catch (e) { /* 무시 */ }
+    ssRemove(cacheKey(GUEST_SCOPE));
     lsRemove(SCOPE_KEY);
     refreshUI();
     return true;
   }
 
   function init() {
+    // 지난 세션의 게스트 기록 정리 (로그인 계정 데이터는 건드리지 않음)
+    try {
+      if (startSession()) refreshUI();
+    } catch (e) { /* 무시 */ }
+
     // 저장된 세션 확인이 끝난 뒤에 판단해야 합니다.
     // (그 전에는 로그인 상태여도 잠시 로그아웃으로 보입니다)
     try {
