@@ -1,12 +1,13 @@
 /**
- * PixelFun - 랭킹/리더보드 시스템 (에이전트4)
- * Firebase Firestore가 있으면 사용, 없으면 localStorage 로컬 모드로 폴백
+ * PixelFun - 랭킹/리더보드 시스템
+ * Supabase가 설정돼 있으면 rankings 테이블을 사용, 없으면 localStorage 로컬 모드로 폴백
  * 글로벌 객체: window.PixelRanking
  */
 (function () {
   'use strict';
 
   var LOCAL_KEY = 'pixelfun_local_ranking';
+  var TABLE = 'rankings';
 
   var GAMES = {
     number:    { label: '숫자 맞추기', icon: '🔢', lowerIsBetter: true  },
@@ -21,12 +22,17 @@
     random:    { label: '랜덤 패턴 마스터', icon: '🎲', lowerIsBetter: false }
   };
 
-  // Firestore 사용 가능 여부
-  function getFirestore() {
+  // Supabase 사용 가능 여부
+  function getClient() {
+    try { return window.sb || null; } catch (e) { return null; }
+  }
+
+  // 로그인한 사용자 id (게스트면 null)
+  function currentUserId() {
     try {
-      if (window.firebaseDb) return window.firebaseDb;
-      if (window.firebase && typeof window.firebase.firestore === 'function') {
-        return window.firebase.firestore();
+      if (window.PixelAuth && typeof window.PixelAuth.getUser === 'function') {
+        var u = window.PixelAuth.getUser();
+        if (u && !u.isGuest && u.uid) return u.uid;
       }
     } catch (e) {}
     return null;
@@ -108,49 +114,55 @@
     }
   }
 
-  // Firestore 모드
-  function submitFirestore(db, game, score, name) {
+  // ===== Supabase 모드 =====
+  function submitCloud(sb, game, score, name) {
     try {
-      return db.collection('rankings').add({
+      var row = {
         game: game,
-        name: name,
-        score: Number(score),
-        createdAt: (window.firebase && window.firebase.firestore && window.firebase.firestore.FieldValue)
-          ? window.firebase.firestore.FieldValue.serverTimestamp()
-          : new Date()
-      }).then(function () { return true; })
-        .catch(function () {
-          submitLocal(game, score, name);
-          return false;
-        });
+        name: String(name).slice(0, 20),
+        score: Number(score)
+      };
+      var uid = currentUserId();
+      if (uid) row.user_id = uid;
+
+      return sb.from(TABLE).insert(row).then(function (res) {
+        if (res.error) throw res.error;
+        // 온라인 저장에 성공해도 로컬 사본은 남겨 오프라인 조회를 돕습니다.
+        submitLocal(game, score, name);
+        return true;
+      }).catch(function (err) {
+        console.warn('[PixelFun] 랭킹 등록 실패, 로컬에 저장합니다.', err && err.message);
+        submitLocal(game, score, name);
+        return false;
+      });
     } catch (e) {
       submitLocal(game, score, name);
       return Promise.resolve(false);
     }
   }
 
-  function getTopFirestore(db, game, limit) {
+  function getTopCloud(sb, game, limit) {
     try {
       var meta = GAMES[game] || {};
-      var direction = meta.lowerIsBetter ? 'asc' : 'desc';
-      return db.collection('rankings')
-        .where('game', '==', game)
-        .orderBy('score', direction)
+      var asc = !!meta.lowerIsBetter;
+      return sb.from(TABLE)
+        .select('name,score,created_at')
+        .eq('game', game)
+        .order('score', { ascending: asc })
+        .order('created_at', { ascending: true })
         .limit(limit || 10)
-        .get()
-        .then(function (snap) {
-          var arr = [];
-          snap.forEach(function (doc) {
-            var d = doc.data() || {};
-            arr.push({
+        .then(function (res) {
+          if (res.error) throw res.error;
+          return (res.data || []).map(function (d) {
+            return {
               name: d.name || '익명',
               score: typeof d.score === 'number' ? d.score : Number(d.score) || 0,
-              ts: (d.createdAt && d.createdAt.toMillis) ? d.createdAt.toMillis() : 0
-            });
+              ts: d.created_at ? new Date(d.created_at).getTime() : 0
+            };
           });
-          return arr;
         })
-        .catch(function () {
+        .catch(function (err) {
+          console.warn('[PixelFun] 랭킹 조회 실패, 로컬 기록을 표시합니다.', err && err.message);
           return getTopLocal(game, limit);
         });
     } catch (e) {
@@ -163,10 +175,8 @@
     try {
       if (!game || score === undefined || score === null) return Promise.resolve(false);
       var name = resolveName();
-      var db = getFirestore();
-      if (db) {
-        return Promise.resolve(submitFirestore(db, game, score, name));
-      }
+      var sb = getClient();
+      if (sb) return submitCloud(sb, game, score, name);
       submitLocal(game, score, name);
       return Promise.resolve(true);
     } catch (e) {
@@ -177,10 +187,8 @@
   // 공개: 상위 N명
   function getTop(game, limit) {
     try {
-      var db = getFirestore();
-      if (db) {
-        return Promise.resolve(getTopFirestore(db, game, limit));
-      }
+      var sb = getClient();
+      if (sb) return getTopCloud(sb, game, limit);
       return Promise.resolve(getTopLocal(game, limit));
     } catch (e) {
       return Promise.resolve([]);
@@ -228,7 +236,7 @@
                 GAMES[k].icon + ' ' + escapeHtml(GAMES[k].label) + '</option>';
       });
       html += '  </select>';
-      var mode = getFirestore() ? '온라인' : '로컬';
+      var mode = getClient() ? '온라인' : '로컬';
       html += '  <span class="ranking-mode">[' + mode + ' 모드]</span>';
       html += '</div>';
       html += '<ol class="ranking-list" id="rankingList"><li class="ranking-loading">불러오는 중...</li></ol>';
@@ -303,6 +311,13 @@
     try {
       var section = document.getElementById('rankingSection');
       if (section) renderInto('rankingSection');
+    } catch (e) {}
+    // 로그인/로그아웃 시 리더보드 갱신 (이름 표시 변경 반영)
+    try {
+      window.addEventListener('authChange', function () {
+        var section = document.getElementById('rankingSection');
+        if (section) renderInto('rankingSection', section.getAttribute('data-current-game'));
+      });
     } catch (e) {}
   }
 

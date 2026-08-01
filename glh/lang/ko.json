@@ -44,13 +44,15 @@
     "loginFailed": "로그인 실패",
     "guestModeOnly": "게스트 모드만 사용 가능합니다",
     "emailPlaceholder": "이메일을 입력하세요",
-    "passwordPlaceholder": "비밀번호를 입력하세요",
-    "nicknamePlaceholder": "닉네임을 입력하세요",
+    "passwordPlaceholder": "비밀번호를 입력하세요 (6자 이상)",
+    "nicknamePlaceholder": "닉네임 (회원가입/게스트 공용)",
     "or": "또는",
     "close": "닫기",
     "signupSuccess": "회원가입 성공! 자동 로그인됩니다",
+    "confirmEmail": "가입 확인 메일을 보냈습니다. 메일함을 확인해 주세요",
     "logoutSuccess": "로그아웃되었습니다",
-    "guestWelcome": "게스트 모드로 시작합니다"
+    "guestWelcome": "게스트 모드로 시작합니다",
+    "loading": "처리 중..."
   },
   "game": {
     "start": "게임 시작",

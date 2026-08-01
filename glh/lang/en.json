@@ -44,13 +44,15 @@
     "loginFailed": "Login failed",
     "guestModeOnly": "Guest mode only available",
     "emailPlaceholder": "Enter your email",
-    "passwordPlaceholder": "Enter your password",
-    "nicknamePlaceholder": "Enter a nickname",
+    "passwordPlaceholder": "Enter your password (6+ characters)",
+    "nicknamePlaceholder": "Nickname (for sign up / guest)",
     "or": "or",
     "close": "Close",
     "signupSuccess": "Sign up successful! Logging in automatically",
+    "confirmEmail": "Confirmation email sent. Please check your inbox",
     "logoutSuccess": "Logged out successfully",
-    "guestWelcome": "Starting in guest mode"
+    "guestWelcome": "Starting in guest mode",
+    "loading": "Processing..."
   },
   "game": {
     "start": "Start Game",

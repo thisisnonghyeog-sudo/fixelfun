@@ -4,7 +4,8 @@
 - **사이트명**: PixelFun
 - **컨셉**: 레트로 픽셀 감성의 미니게임 모음 웹사이트
 - **슬로건**: "두뇌를 깨우는 미니게임 모음"
-- **기술 스택**: HTML / CSS / JavaScript (순수 바닐라), Firebase
+- **기술 스택**: HTML / CSS / JavaScript (순수 바닐라), Supabase (Auth + Postgres)
+- **백엔드 설정**: `SETUP.md` 참고 / 스키마는 `supabase/schema.sql`
 
 ---
 
@@ -62,14 +63,14 @@
 - `js/sound.js` - 효과음/BGM
 
 **작업 내용**
-- Firebase Firestore 랭킹 연동
+- Supabase `rankings` 테이블 랭킹 연동
 - 마이페이지 통계 차트
 - 배지 획득 조건 및 알림 팝업
 - 사운드 ON/OFF 설정 저장
 
 ### 🌍 에이전트5 - 로그인/다국어
 **담당 파일 (이 파일만 수정할 것)**
-- `js/auth.js` - Firebase 인증
+- `js/auth.js` - Supabase 인증
 - `js/i18n.js` - 다국어 처리
 - `lang/ko.json` - 한국어
 - `lang/en.json` - 영어
@@ -233,7 +234,7 @@ t('nav.home')         // "홈으로" / "Home"
 3. **폰트 통일**: 모든 HTML에 구글 폰트 링크 포함
 4. **반응형 필수**: 모바일에서도 게임이 정상 작동해야 함
 5. **한국어 우선**: 기본 언어는 한국어, 영어는 i18n으로 처리
-6. **에러 처리**: Firebase 오류 시 게스트 모드로 폴백 처리
+6. **에러 처리**: Supabase 오류 시 게스트 모드 / localStorage로 폴백 처리
 7. **작업 완료 보고**: 파일 작성 완료 시 리드 에이전트에게 완료 메시지 전송
 
 ---
