@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>체스 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    /* 게임 중 콘텐츠 높이 변화로 스크롤바가 나타났다 사라질 때
+       viewport 너비가 바뀌어 보드 크기가 미세하게 흔들리는 것을 방지 */
+    html { overflow-y: scroll; scrollbar-gutter: stable; }
+
+    .chess-intro, .chess-play, .chess-result { display: none; }
+    .chess-intro.active, .chess-play.active, .chess-result.active { display: block; }
+
+    /* .game-container가 align-items:center 이므로 섹션에 width를 명시하지 않으면
+       내부 콘텐츠(HUD 점수 텍스트 등)에 따라 폭이 바뀌어 보드 크기가 흔들림.
+       섹션을 컨테이너 폭에 고정해 보드가 항상 동일 사이즈로 렌더되도록 함. */
+    .chess-intro, .chess-play, .chess-result {
+      width: 100%;
+      max-width: 900px;
+      box-sizing: border-box;
+    }
+    .board-wrap, .chess-board {
+      width: min(480px, 100%);
+      max-width: 480px;
+    }
+
+    .chess-intro {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .chess-intro h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      font-size: 1.8rem;
+      margin-bottom: 24px;
+      text-shadow: 0 0 12px rgba(123, 47, 247, 0.7);
+    }
+    .chess-intro p {
+      color: var(--text-secondary);
+      line-height: 1.8;
+      margin-bottom: 10px;
+    }
+    .chess-best {
+      color: var(--neon-yellow);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9rem;
+      margin: 20px 0;
+    }
+
+    .chess-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .hud-item {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-purple);
+      border-radius: 12px;
+      padding: 10px 16px;
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      box-shadow: 0 0 14px rgba(123, 47, 247, 0.25);
+    }
+    .hud-item .label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .hud-item .value {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.1rem;
+    }
+    .hud-item.turn .value { color: var(--neon-yellow); }
+    .hud-item.check .value { color: var(--neon-red); }
+
+    .board-wrap {
+      max-width: 560px;
+      margin: 0 auto;
+    }
+    .captured {
+      min-height: 32px;
+      font-size: 1.6rem;
+      letter-spacing: 2px;
+      padding: 4px 8px;
+      color: var(--text-secondary);
+      text-align: left;
+    }
+    .captured .cap-label {
+      display: inline-block;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.65rem;
+      color: var(--text-secondary);
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .chess-board {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      grid-template-rows: repeat(8, minmax(0, 1fr));
+      aspect-ratio: 1 / 1;
+      width: 100%;
+      max-width: 560px;
+      margin: 0 auto;
+      border: 3px solid var(--neon-purple);
+      border-radius: 8px;
+      overflow: hidden;
+      box-shadow: 0 0 24px rgba(123, 47, 247, 0.4);
+      user-select: none;
+    }
+    .square {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
+      min-height: 0;
+      font-size: clamp(1.6rem, 6vw, 2.6rem);
+      line-height: 1;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .square > span {
+      line-height: 1;
+    }
+    .square.light { background: #2a2a4a; }
+    .square.dark  { background: #15152a; }
+    .square:hover { background: var(--bg-hover); }
+    .square.selected {
+      background: rgba(255, 215, 0, 0.35) !important;
+      box-shadow: inset 0 0 0 3px var(--neon-yellow);
+    }
+    .square.last-move {
+      box-shadow: inset 0 0 0 2px var(--neon-blue);
+    }
+    .square.in-check {
+      background: rgba(255, 71, 87, 0.45) !important;
+      animation: pulse 0.8s infinite;
+    }
+    .square .dot {
+      position: absolute;
+      width: 26%;
+      height: 26%;
+      border-radius: 50%;
+      background: var(--neon-green);
+      opacity: 0.6;
+      pointer-events: none;
+      box-shadow: 0 0 12px var(--neon-green);
+    }
+    .square .ring {
+      position: absolute;
+      inset: 8%;
+      border: 3px solid var(--neon-red);
+      border-radius: 50%;
+      pointer-events: none;
+      box-shadow: 0 0 12px var(--neon-red);
+    }
+    .piece-w { color: #ffffff; text-shadow: 0 0 6px rgba(0, 212, 255, 0.7), 0 1px 0 #000; }
+    .piece-b { color: #1a1a2e; text-shadow: 0 0 6px rgba(123, 47, 247, 0.8), 0 1px 0 #fff; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+
+    .chess-controls {
+      display: flex;
+      justify-content: center;
+      gap: 12px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .difficulty-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 18px 0;
+    }
+    .diff-btn {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.75rem;
+      padding: 12px 18px;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 2px solid var(--neon-purple);
+      border-radius: var(--radius-btn);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .diff-btn:hover { color: var(--neon-blue); box-shadow: 0 0 14px rgba(0, 212, 255, 0.4); }
+    .diff-btn.active {
+      background: var(--neon-purple);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(123, 47, 247, 0.7);
+    }
+
+    .chess-result {
+      text-align: center;
+      padding: 30px 20px;
+    }
+    .grade-badge {
+      display: inline-block;
+      width: 160px;
+      height: 160px;
+      line-height: 160px;
+      border-radius: 50%;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 4rem;
+      margin: 20px 0;
+      border: 4px solid currentColor;
+    }
+    .grade-S { color: var(--neon-yellow); box-shadow: 0 0 36px var(--neon-yellow); }
+    .grade-A { color: var(--neon-green); box-shadow: 0 0 30px var(--neon-green); }
+    .grade-B { color: var(--neon-blue); box-shadow: 0 0 24px var(--neon-blue); }
+    .grade-C { color: var(--neon-red); box-shadow: 0 0 20px var(--neon-red); }
+
+    .result-stats { margin: 24px 0; color: var(--text-secondary); }
+    .result-stats .big {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.6rem;
+      display: block;
+      margin: 6px 0;
+    }
+    .result-outcome {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.1rem;
+      margin: 10px 0;
+    }
+    .outcome-win { color: var(--neon-green); }
+    .outcome-lose { color: var(--neon-red); }
+    .outcome-draw { color: var(--neon-yellow); }
+    .new-record {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 1.1rem;
+      margin: 14px 0;
+      animation: pulse 1s infinite;
+    }
+    .result-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+
+    .status-bar {
+      text-align: center;
+      min-height: 28px;
+      margin: 8px 0;
+      color: var(--neon-yellow);
+      font-size: 0.95rem;
+    }
+
+    @media (max-width: 600px) {
+      .grade-badge { width: 120px; height: 120px; line-height: 120px; font-size: 3rem; }
+      .hud-item .value { font-size: 0.9rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">체스</span>
+  </nav>
+
+  <main class="game-container">
+    <section class="chess-intro active" id="introScreen">
+      <h1>체스</h1>
+      <p>색과 선공을 직접 골라 AI와 대결하세요.</p>
+      <p>기물을 클릭해 선택하고, 이동할 칸을 클릭하세요.</p>
+      <p>잡은 기물 값 - 잃은 기물 값으로 점수가 계산됩니다 (폰1·기사3·비숍3·룩5·퀸9).</p>
+      <p>외통수 승리 시 +50점, 패배 시 -30점.</p>
+
+      <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 14px;">난이도 선택</div>
+      <div class="difficulty-row" id="diffRow">
+        <button class="diff-btn" data-diff="easy">쉬움</button>
+        <button class="diff-btn active" data-diff="normal">보통</button>
+        <button class="diff-btn" data-diff="hard">어려움</button>
+      </div>
+      <div id="diffDesc" style="color: var(--text-secondary); font-size: 0.8rem; margin-top: -6px; min-height: 1.2em;">
+        한 수 앞을 내다보며 둡니다. 기물을 걸어두면 잘 잡아갑니다.
+      </div>
+
+      <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 14px;">내 색</div>
+      <div class="difficulty-row" id="colorRow">
+        <button class="diff-btn active" data-color="w">⚪ 흰색</button>
+        <button class="diff-btn" data-color="b">⚫ 검은색</button>
+        <button class="diff-btn" data-color="random">🎲 랜덤</button>
+      </div>
+
+      <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 14px;">선공</div>
+      <div class="difficulty-row" id="orderRow">
+        <button class="diff-btn active" data-order="player">내가 먼저</button>
+        <button class="diff-btn" data-order="ai">AI가 먼저</button>
+        <button class="diff-btn" data-order="random">🎲 랜덤</button>
+      </div>
+
+      <div class="chess-best" id="introBest">최고 기록: 0</div>
+      <button class="btn-primary" id="startBtn">게임 시작</button>
+    </section>
+
+    <section class="chess-play" id="playScreen">
+      <div class="chess-hud">
+        <div class="hud-item">
+          <span class="label">난이도</span>
+          <span class="value" id="diffVal">보통</span>
+        </div>
+        <div class="hud-item turn">
+          <span class="label">차례</span>
+          <span class="value" id="turnVal">백</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">점수</span>
+          <span class="value" id="scoreVal">0</span>
+        </div>
+        <div class="hud-item check">
+          <span class="label">상태</span>
+          <span class="value" id="statusVal">-</span>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <div class="captured" id="capturedByPlayer">
+          <span class="cap-label">잡은 기물</span>
+        </div>
+        <div class="chess-board" id="chessBoard"></div>
+        <div class="captured" id="capturedByAI">
+          <span class="cap-label">잃은 기물</span>
+        </div>
+      </div>
+
+      <div class="status-bar" id="statusBar"></div>
+
+      <div class="chess-controls">
+        <button class="btn-secondary" id="retryPlayBtn">다시하기</button>
+        <button class="btn-secondary" id="resignBtn">기권</button>
+        <a href="../index.html" class="btn-secondary">홈으로</a>
+      </div>
+    </section>
+
+    <section class="chess-result" id="resultScreen">
+      <h2 style="font-family:'Press Start 2P', cursive; color: var(--neon-purple);">결과</h2>
+      <div class="grade-badge" id="gradeBadge">-</div>
+      <div class="result-outcome" id="resultOutcome"></div>
+      <div class="result-stats">
+        <span>최종 점수</span>
+        <span class="big" id="finalScore">0</span>
+        <span id="materialLine">잡음 0 / 잃음 0</span>
+      </div>
+      <div class="new-record" id="newRecord" style="display:none;">🎉 신기록!</div>
+      <div class="result-buttons">
+        <button class="btn-primary" id="retryBtn">다시하기</button>
+        <a href="../index.html" class="btn-secondary">홈으로</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function () {
+      // ============================================================
+      // 체스 게임 - 사용자(백) vs 간단한 AI(흑)
+      // 캐슬링/앙파상 제외, 폰 승급은 자동 퀸.
+      // ============================================================
+      const PIECE_GLYPH = {
+        w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
+        b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
+      };
+      // 왕에 큰 가치를 부여 → AI가 노출된 왕을 우선적으로 잡도록 함.
+      // (computeScore는 왕을 별도로 제외해서 최종 점수 폭주를 막음)
+      const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 1000 };
+
+      const boardEl = document.getElementById('chessBoard');
+      const introScreen = document.getElementById('introScreen');
+      const playScreen = document.getElementById('playScreen');
+      const resultScreen = document.getElementById('resultScreen');
+      const startBtn = document.getElementById('startBtn');
+      const retryBtn = document.getElementById('retryBtn');
+      const resignBtn = document.getElementById('resignBtn');
+      const turnVal = document.getElementById('turnVal');
+      const scoreVal = document.getElementById('scoreVal');
+      const statusVal = document.getElementById('statusVal');
+      const statusBar = document.getElementById('statusBar');
+      const introBest = document.getElementById('introBest');
+      const diffRow = document.getElementById('diffRow');
+      const diffVal = document.getElementById('diffVal');
+      const gradeBadge = document.getElementById('gradeBadge');
+      const finalScore = document.getElementById('finalScore');
+      const materialLine = document.getElementById('materialLine');
+      const newRecord = document.getElementById('newRecord');
+      const resultOutcome = document.getElementById('resultOutcome');
+      const capByPlayer = document.getElementById('capturedByPlayer');
+      const capByAI = document.getElementById('capturedByAI');
+
+      const DIFF_NAME = { easy: '쉬움', normal: '보통', hard: '어려움' };
+
+      let board = [];
+      let turn = 'w';
+      let selected = null;
+      let legalForSelected = [];
+      let lastMove = null;
+      let capturedByPlayer = [];
+      let capturedByAI = [];
+      let gameOver = false;
+      let playerLocked = false;
+      let difficulty = 'normal';
+      let playerColor = 'w';        // 'w' 또는 'b' — 사용자가 잡는 색 (실제 적용값)
+      let aiColor = 'b';            // playerColor의 반대
+      let firstMover = 'player';    // 'player' 또는 'ai' — 누가 먼저 두는지 (실제 적용값)
+      // 사용자 선택 의도 ('random' 가능). startGame에서 실제값으로 해석.
+      let colorIntent = 'w';
+      let orderIntent = 'player';
+
+      function showScreen(target) {
+        [introScreen, playScreen, resultScreen].forEach(s => s.classList.remove('active'));
+        target.classList.add('active');
+      }
+
+      function loadBest() {
+        const best = parseInt(localStorage.getItem('pixelfun_chess_best') || '0', 10);
+        introBest.textContent = '최고 기록: ' + best;
+      }
+
+      function initialBoard() {
+        const empty = () => Array.from({ length: 8 }, () => null);
+        const b = Array.from({ length: 8 }, empty);
+        const backRank = ['r','n','b','q','k','b','n','r'];
+        for (let c = 0; c < 8; c++) {
+          b[0][c] = { type: backRank[c], color: 'b' };
+          b[1][c] = { type: 'p', color: 'b' };
+          b[6][c] = { type: 'p', color: 'w' };
+          b[7][c] = { type: backRank[c], color: 'w' };
+        }
+        return b;
+      }
+
+      function cloneBoard(b) {
+        return b.map(row => row.map(cell => cell ? { type: cell.type, color: cell.color } : null));
+      }
+
+      function inBounds(r, c) {
+        return r >= 0 && r < 8 && c >= 0 && c < 8;
+      }
+
+      function findKing(b, color) {
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = b[r][c];
+            if (p && p.type === 'k' && p.color === color) return { r, c };
+          }
+        }
+        return null;
+      }
+
+      // 체크 무시한 raw 이동(공격 대상 계산용)
+      function rawMoves(b, r, c) {
+        const piece = b[r][c];
+        if (!piece) return [];
+        const moves = [];
+        const color = piece.color;
+        const enemy = color === 'w' ? 'b' : 'w';
+
+        const slide = (dr, dc) => {
+          let nr = r + dr, nc = c + dc;
+          while (inBounds(nr, nc)) {
+            const t = b[nr][nc];
+            if (!t) {
+              moves.push({ r: nr, c: nc });
+            } else {
+              if (t.color === enemy) moves.push({ r: nr, c: nc });
+              break;
+            }
+            nr += dr; nc += dc;
+          }
+        };
+        const step = (dr, dc) => {
+          const nr = r + dr, nc = c + dc;
+          if (!inBounds(nr, nc)) return;
+          const t = b[nr][nc];
+          if (!t || t.color === enemy) moves.push({ r: nr, c: nc });
+        };
+
+        switch (piece.type) {
+          case 'p': {
+            const dir = color === 'w' ? -1 : 1;
+            const startRow = color === 'w' ? 6 : 1;
+            // 전진 1
+            if (inBounds(r + dir, c) && !b[r + dir][c]) {
+              moves.push({ r: r + dir, c });
+              // 전진 2
+              if (r === startRow && !b[r + 2 * dir][c]) {
+                moves.push({ r: r + 2 * dir, c });
+              }
+            }
+            // 대각 캡처
+            for (const dc of [-1, 1]) {
+              const nr = r + dir, nc = c + dc;
+              if (inBounds(nr, nc) && b[nr][nc] && b[nr][nc].color === enemy) {
+                moves.push({ r: nr, c: nc });
+              }
+            }
+            break;
+          }
+          case 'n': {
+            const deltas = [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]];
+            for (const [dr, dc] of deltas) step(dr, dc);
+            break;
+          }
+          case 'b': {
+            slide(-1,-1); slide(-1,1); slide(1,-1); slide(1,1);
+            break;
+          }
+          case 'r': {
+            slide(-1,0); slide(1,0); slide(0,-1); slide(0,1);
+            break;
+          }
+          case 'q': {
+            slide(-1,-1); slide(-1,1); slide(1,-1); slide(1,1);
+            slide(-1,0); slide(1,0); slide(0,-1); slide(0,1);
+            break;
+          }
+          case 'k': {
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                if (dr === 0 && dc === 0) continue;
+                step(dr, dc);
+              }
+            }
+            break;
+          }
+        }
+        return moves;
+      }
+
+      function isSquareAttacked(b, r, c, byColor) {
+        for (let rr = 0; rr < 8; rr++) {
+          for (let cc = 0; cc < 8; cc++) {
+            const p = b[rr][cc];
+            if (!p || p.color !== byColor) continue;
+            const ms = rawMoves(b, rr, cc);
+            for (const m of ms) {
+              if (m.r === r && m.c === c) return true;
+            }
+          }
+        }
+        return false;
+      }
+
+      function isInCheck(b, color) {
+        const k = findKing(b, color);
+        if (!k) return false;
+        return isSquareAttacked(b, k.r, k.c, color === 'w' ? 'b' : 'w');
+      }
+
+      function applyMove(b, from, to) {
+        const piece = b[from.r][from.c];
+        const captured = b[to.r][to.c];
+        b[to.r][to.c] = piece;
+        b[from.r][from.c] = null;
+        // 폰 자동 승급 (퀸)
+        if (piece.type === 'p' && (to.r === 0 || to.r === 7)) {
+          b[to.r][to.c] = { type: 'q', color: piece.color };
+        }
+        return captured;
+      }
+
+      function legalMovesFrom(b, r, c, ignoreCheck) {
+        const piece = b[r][c];
+        if (!piece) return [];
+        const raw = rawMoves(b, r, c);
+        if (ignoreCheck) return raw; // 체크 필터 우회 (체크 상태에서도 자유롭게 둘 수 있음)
+        const legal = [];
+        for (const m of raw) {
+          const test = cloneBoard(b);
+          applyMove(test, { r, c }, m);
+          if (!isInCheck(test, piece.color)) legal.push(m);
+        }
+        return legal;
+      }
+
+      function allLegalMoves(b, color) {
+        const moves = [];
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = b[r][c];
+            if (!p || p.color !== color) continue;
+            const ms = legalMovesFrom(b, r, c);
+            for (const m of ms) moves.push({ from: { r, c }, to: m });
+          }
+        }
+        return moves;
+      }
+
+      function render() {
+        boardEl.innerHTML = '';
+        const checkSquare = isInCheck(board, turn) ? findKing(board, turn) : null;
+        // 사용자가 검은색이면 보드를 180도 회전해 자기 진영이 아래에 오게 함
+        const flip = (playerColor === 'b');
+        for (let rr = 0; rr < 8; rr++) {
+          for (let cc = 0; cc < 8; cc++) {
+            const r = flip ? 7 - rr : rr;
+            const c = flip ? 7 - cc : cc;
+            const sq = document.createElement('div');
+            sq.className = 'square ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
+            sq.dataset.r = r;
+            sq.dataset.c = c;
+            if (lastMove && ((lastMove.from.r === r && lastMove.from.c === c) ||
+                             (lastMove.to.r === r && lastMove.to.c === c))) {
+              sq.classList.add('last-move');
+            }
+            if (selected && selected.r === r && selected.c === c) sq.classList.add('selected');
+            if (checkSquare && checkSquare.r === r && checkSquare.c === c) sq.classList.add('in-check');
+
+            const piece = board[r][c];
+            if (piece) {
+              const span = document.createElement('span');
+              span.textContent = PIECE_GLYPH[piece.color][piece.type];
+              span.className = piece.color === 'w' ? 'piece-w' : 'piece-b';
+              sq.appendChild(span);
+            }
+
+            // 이동 가능 표시
+            if (selected) {
+              const hit = legalForSelected.find(m => m.r === r && m.c === c);
+              if (hit) {
+                const marker = document.createElement('div');
+                marker.className = piece ? 'ring' : 'dot';
+                sq.appendChild(marker);
+              }
+            }
+
+            sq.addEventListener('click', onSquareClick);
+            boardEl.appendChild(sq);
+          }
+        }
+
+        // HUD — 현재 차례를 사용자 색 기준으로 표시
+        turnVal.textContent = (turn === playerColor ? '당신' : 'AI') +
+                              ' (' + (turn === 'w' ? '백' : '흑') + ')';
+        scoreVal.textContent = computeScore();
+        if (isInCheck(board, turn)) {
+          statusVal.textContent = '체크!';
+          statusVal.parentElement.style.borderColor = 'var(--neon-red)';
+        } else {
+          statusVal.textContent = '-';
+          statusVal.parentElement.style.borderColor = 'var(--neon-purple)';
+        }
+
+        renderCaptured();
+      }
+
+      function renderCaptured() {
+        capByPlayer.innerHTML = '<span class="cap-label">잡은 기물</span>';
+        capturedByPlayer.forEach(t => {
+          const s = document.createElement('span');
+          s.textContent = PIECE_GLYPH.b[t];
+          s.className = 'piece-b';
+          capByPlayer.appendChild(s);
+        });
+        capByAI.innerHTML = '<span class="cap-label">잃은 기물</span>';
+        capturedByAI.forEach(t => {
+          const s = document.createElement('span');
+          s.textContent = PIECE_GLYPH.w[t];
+          s.className = 'piece-w';
+          capByAI.appendChild(s);
+        });
+      }
+
+      function computeScore() {
+        let s = 0;
+        // 왕은 외통 보너스/패배 페널티로 별도 처리하므로 자재 점수에서 제외
+        capturedByPlayer.forEach(t => { if (t !== 'k') s += VALUE[t]; });
+        capturedByAI.forEach(t => { if (t !== 'k') s -= VALUE[t]; });
+        return s;
+      }
+
+      function onSquareClick(e) {
+        if (gameOver) return;
+        const r = parseInt(e.currentTarget.dataset.r, 10);
+        const c = parseInt(e.currentTarget.dataset.c, 10);
+        const piece = board[r][c];
+
+        // 미리보기 모드: AI가 생각 중이거나 내 차례가 아닐 때는
+        // 기물 선택과 이동 가능 칸 표시만 허용 (실제 이동은 차단)
+        const previewOnly = playerLocked || turn !== playerColor;
+
+        if (selected) {
+          // 같은 칸 클릭 -> 선택 해제
+          if (selected.r === r && selected.c === c) {
+            selected = null;
+            legalForSelected = [];
+            render();
+            return;
+          }
+          // 합법 이동인지
+          const hit = legalForSelected.find(m => m.r === r && m.c === c);
+          if (hit) {
+            if (previewOnly) {
+              // 미리보기 모드: 이동하지 않고 선택만 유지
+              return;
+            }
+            doPlayerMove(selected, hit);
+            return;
+          }
+          // 자신의 다른 기물 선택 (미리보기 모드에서도 가능)
+          if (piece && piece.color === playerColor) {
+            selected = { r, c };
+            legalForSelected = legalMovesFrom(board, r, c, true);
+            render();
+            return;
+          }
+          // 그 외 -> 해제
+          selected = null;
+          legalForSelected = [];
+          render();
+          return;
+        }
+
+        // 자기 기물 클릭 -> 선택 (미리보기 모드에서도 허용)
+        if (piece && piece.color === playerColor) {
+          selected = { r, c };
+          legalForSelected = legalMovesFrom(board, r, c, true);
+          render();
+        }
+      }
+
+      function doPlayerMove(from, to) {
+        const captured = applyMove(board, from, to);
+        if (captured) {
+          capturedByPlayer.push(captured.type);
+          if (window.PixelSound) PixelSound.play('success');
+        } else {
+          if (window.PixelSound) PixelSound.play('flip');
+        }
+        lastMove = { from, to };
+        selected = null;
+        legalForSelected = [];
+        turn = aiColor;
+        render();
+
+        // 사용자가 AI 왕을 잡으면 즉시 승리 (체크 무시 모드의 부산물 가드)
+        if (captured && captured.type === 'k') {
+          gameOver = true;
+          playerLocked = true;
+          showResult('win', 50);
+          return;
+        }
+
+        if (checkEndAfterMove()) return;
+
+        statusBar.textContent = difficulty === 'hard' ? 'AI 가 깊이 생각 중...' : 'AI 가 생각 중...';
+        playerLocked = true;
+        setTimeout(aiMove, difficulty === 'hard' ? 50 : 400);
+      }
+
+      // AI 관점 평가: AI 색 기물 +, 사용자 색 기물 -
+      function evaluateBoard(b) {
+        let s = 0;
+        for (let r = 0; r < 8; r++) {
+          for (let c = 0; c < 8; c++) {
+            const p = b[r][c];
+            if (!p) continue;
+            const v = VALUE[p.type];
+            s += (p.color === aiColor ? v : -v);
+          }
+        }
+        return s;
+      }
+
+      // 쉬움: 거의 랜덤 - 30% 확률로만 캡처, 자기 기물이 위협받아도 무시
+      // (의도적으로 실수와 헛수를 둠)
+      function pickEasyMove(moves) {
+        const capturingMoves = moves.filter(m => board[m.to.r][m.to.c] !== null);
+        if (capturingMoves.length > 0 && Math.random() < 0.3) {
+          // 캡처도 가치 무시하고 랜덤 선택 (폰으로 퀸을 잡지 않을 수도 있음)
+          return capturingMoves[Math.floor(Math.random() * capturingMoves.length)];
+        }
+        return moves[Math.floor(Math.random() * moves.length)];
+      }
+
+      // 보통: 1-ply + 상대 최선 반격을 1수 가정 (걸어두는 기물 안 잃음)
+      function pickNormalMove(moves) {
+        let best = -Infinity;
+        let bestMoves = [];
+        for (const m of moves) {
+          const test = cloneBoard(board);
+          applyMove(test, m.from, m.to);
+          const baseScore = evaluateBoard(test);
+
+          // 사용자(상대)의 최선 반격을 한 수만 시뮬레이션
+          const replies = allLegalMoves(test, playerColor);
+          let worstAfterReply = baseScore;
+          if (replies.length === 0) {
+            if (isInCheck(test, playerColor)) worstAfterReply = baseScore + 100; // 외통수
+          } else {
+            // 사용자 입장에서는 AI 점수를 최소화하는 수가 최선
+            let minScore = Infinity;
+            for (const r of replies) {
+              const t2 = cloneBoard(test);
+              applyMove(t2, r.from, r.to);
+              const s = evaluateBoard(t2);
+              if (s < minScore) minScore = s;
+            }
+            worstAfterReply = minScore;
+          }
+
+          let score = worstAfterReply;
+          const centerBonus = (m.to.r >= 3 && m.to.r <= 4 && m.to.c >= 3 && m.to.c <= 4) ? 0.1 : 0;
+          score += centerBonus;
+          if (isInCheck(test, playerColor)) score += 0.3;
+
+          if (score > best) { best = score; bestMoves = [m]; }
+          else if (score === best) { bestMoves.push(m); }
+        }
+        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+      }
+
+      // 어려움: 알파-베타 미니맥스. AI 최대화, 사용자 최소화
+      function minimax(b, depth, alpha, beta, maximizing) {
+        const color = maximizing ? aiColor : playerColor;
+        const moves = allLegalMoves(b, color);
+        if (moves.length === 0) {
+          // 외통/스테일메이트
+          if (isInCheck(b, color)) return maximizing ? -10000 : 10000;
+          return 0;
+        }
+        if (depth === 0) return evaluateBoard(b);
+
+        // 캡처 우선 정렬로 알파-베타 가지치기 효율 상승 (깊이 ≥ 3에서 효과 큼)
+        moves.sort((x, y) => {
+          const xv = b[x.to.r][x.to.c] ? VALUE[b[x.to.r][x.to.c].type] : 0;
+          const yv = b[y.to.r][y.to.c] ? VALUE[b[y.to.r][y.to.c].type] : 0;
+          return yv - xv;
+        });
+
+        if (maximizing) {
+          let value = -Infinity;
+          for (const m of moves) {
+            const test = cloneBoard(b);
+            applyMove(test, m.from, m.to);
+            value = Math.max(value, minimax(test, depth - 1, alpha, beta, false));
+            alpha = Math.max(alpha, value);
+            if (alpha >= beta) break;
+          }
+          return value;
+        } else {
+          let value = Infinity;
+          for (const m of moves) {
+            const test = cloneBoard(b);
+            applyMove(test, m.from, m.to);
+            value = Math.min(value, minimax(test, depth - 1, alpha, beta, true));
+            beta = Math.min(beta, value);
+            if (alpha >= beta) break;
+          }
+          return value;
+        }
+      }
+
+      // 어려움 모드를 비동기로 처리: 한 수마다 setTimeout(0)으로 UI 스레드에 양보
+      // (사용자가 AI 생각 중에도 자기 기물을 클릭해 이동 가능 칸을 볼 수 있게 함)
+      function pickHardMoveAsync(moves, done) {
+        const ordered = moves.slice().sort((a, b) => {
+          const av = board[a.to.r][a.to.c] ? VALUE[board[a.to.r][a.to.c].type] : 0;
+          const bv = board[b.to.r][b.to.c] ? VALUE[board[b.to.r][b.to.c].type] : 0;
+          return bv - av;
+        });
+        let best = -Infinity;
+        let bestMoves = [];
+        let i = 0;
+
+        function step() {
+          if (i >= ordered.length) {
+            done(bestMoves[Math.floor(Math.random() * bestMoves.length)]);
+            return;
+          }
+          const m = ordered[i++];
+          const test = cloneBoard(board);
+          applyMove(test, m.from, m.to);
+          // 깊이 3: 사용자 응수 → AI 응수 → 사용자 응수까지 봄
+          let score = minimax(test, 3, -Infinity, Infinity, false);
+          const centerBonus = (m.to.r >= 3 && m.to.r <= 4 && m.to.c >= 3 && m.to.c <= 4) ? 0.05 : 0;
+          score += centerBonus;
+          if (score > best) { best = score; bestMoves = [m]; }
+          else if (score === best) { bestMoves.push(m); }
+          setTimeout(step, 0); // 매 수 평가 후 UI 이벤트 처리 기회 제공
+        }
+        step();
+      }
+
+      function aiMove() {
+        const moves = allLegalMoves(board, aiColor);
+        if (moves.length === 0) {
+          finishGame();
+          return;
+        }
+
+        const onChosen = (chosen) => {
+          if (gameOver) return; // 계산 중에 기권 등으로 게임이 끝났을 수 있음
+          const captured = applyMove(board, chosen.from, chosen.to);
+          if (captured) {
+            capturedByAI.push(captured.type);
+            if (window.PixelSound) PixelSound.play('fail');
+          } else {
+            if (window.PixelSound) PixelSound.play('flip');
+          }
+          lastMove = chosen;
+          turn = playerColor;
+          statusBar.textContent = '';
+          playerLocked = false;
+
+          // 사용자가 체크 무시 모드로 왕을 노출시킨 경우, AI가 왕을 잡을 수 있음 → 즉시 패배
+          if (captured && captured.type === 'k') {
+            selected = null;
+            legalForSelected = [];
+            render();
+            gameOver = true;
+            playerLocked = true;
+            showResult('lose', -30);
+            return;
+          }
+
+          // 사용자가 AI 생각 중에 미리 선택해둔 기물이 있으면,
+          // 변경된 보드 기준으로 이동 가능 칸을 새로 계산해 표시 유지
+          if (selected) {
+            const p = board[selected.r][selected.c];
+            if (p && p.color === playerColor) {
+              legalForSelected = legalMovesFrom(board, selected.r, selected.c, true);
+            } else {
+              // 선택했던 기물이 AI 에게 잡혔거나 사라진 경우 해제
+              selected = null;
+              legalForSelected = [];
+            }
+          }
+
+          render();
+          checkEndAfterMove();
+        };
+
+        if (difficulty === 'easy') onChosen(pickEasyMove(moves));
+        else if (difficulty === 'hard') pickHardMoveAsync(moves, onChosen);
+        else onChosen(pickNormalMove(moves));
+      }
+
+      function checkEndAfterMove() {
+        const moves = allLegalMoves(board, turn);
+        if (moves.length === 0) {
+          finishGame();
+          return true;
+        }
+        return false;
+      }
+
+      function finishGame() {
+        if (gameOver) return;
+        gameOver = true;
+        playerLocked = true;
+        const inCheck = isInCheck(board, turn);
+        let outcome; // 'win' 'lose' 'draw' 'resign'
+        let bonus = 0;
+        if (!inCheck) {
+          outcome = 'draw';
+        } else if (turn === aiColor) {
+          // 둘 차례인데 못 두고 체크 → 그쪽이 외통수 (= 그 반대편 승리)
+          outcome = 'win';
+          bonus = 50;
+        } else {
+          outcome = 'lose';
+          bonus = -30;
+        }
+        showResult(outcome, bonus);
+      }
+
+      function resignGame() {
+        if (gameOver) return;
+        gameOver = true;
+        playerLocked = true;
+        showResult('resign', -30);
+      }
+
+      function showResult(outcome, bonus) {
+        const material = computeScore();
+        const total = material + bonus;
+        const best = parseInt(localStorage.getItem('pixelfun_chess_best') || '0', 10);
+        const isNewRecord = total > best;
+        if (isNewRecord) localStorage.setItem('pixelfun_chess_best', total);
+
+        let grade;
+        if (total >= 30) grade = 'S';
+        else if (total >= 15) grade = 'A';
+        else if (total >= 5) grade = 'B';
+        else grade = 'C';
+
+        gradeBadge.textContent = grade;
+        gradeBadge.className = 'grade-badge grade-' + grade;
+        finalScore.textContent = total;
+        const captSum = capturedByPlayer.reduce((a,t)=>a + (t === 'k' ? 0 : VALUE[t]), 0);
+        const lossSum = capturedByAI.reduce((a,t)=>a + (t === 'k' ? 0 : VALUE[t]), 0);
+        materialLine.textContent = `잡음 ${captSum} / 잃음 ${lossSum} (보너스 ${bonus >= 0 ? '+' : ''}${bonus})`;
+
+        if (outcome === 'win') {
+          resultOutcome.textContent = '체크메이트 승리!';
+          resultOutcome.className = 'result-outcome outcome-win';
+          if (window.PixelSound) PixelSound.play('clear');
+        } else if (outcome === 'lose') {
+          resultOutcome.textContent = '체크메이트 패배';
+          resultOutcome.className = 'result-outcome outcome-lose';
+          if (window.PixelSound) PixelSound.play('fail');
+        } else if (outcome === 'resign') {
+          resultOutcome.textContent = '기권';
+          resultOutcome.className = 'result-outcome outcome-lose';
+        } else {
+          resultOutcome.textContent = '스테일메이트 (무승부)';
+          resultOutcome.className = 'result-outcome outcome-draw';
+        }
+
+        newRecord.style.display = isNewRecord ? 'block' : 'none';
+
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: {
+            game: 'chess',
+            score: total,
+            isNewRecord: isNewRecord,
+            grade: grade,
+            outcome: outcome,
+            captured: captSum,
+            lost: lossSum,
+            difficulty: difficulty
+          }
+        }));
+        showScreen(resultScreen);
+      }
+
+      function startGame() {
+        board = initialBoard();
+        // 랜덤 선택 해석
+        const rolledColor = (colorIntent === 'random');
+        const rolledOrder = (orderIntent === 'random');
+        playerColor = rolledColor ? (Math.random() < 0.5 ? 'w' : 'b') : colorIntent;
+        firstMover  = rolledOrder ? (Math.random() < 0.5 ? 'player' : 'ai') : orderIntent;
+        // 보드는 항상 표준 배치(흰색=하단). 사용자가 검은색을 잡으면 렌더가 회전.
+        aiColor = (playerColor === 'w') ? 'b' : 'w';
+        // 첫 차례: 선공 설정대로
+        turn = (firstMover === 'player') ? playerColor : aiColor;
+        selected = null;
+        legalForSelected = [];
+        lastMove = null;
+        capturedByPlayer = [];
+        capturedByAI = [];
+        gameOver = false;
+        playerLocked = false;
+        statusBar.textContent = '';
+        diffVal.textContent = DIFF_NAME[difficulty];
+        if (window.PixelSound) PixelSound.play('start');
+        showScreen(playScreen);
+        render();
+
+        // 랜덤으로 결정된 항목이 있으면 결과를 알려줌
+        if (rolledColor || rolledOrder) {
+          const parts = [];
+          if (rolledColor) parts.push('색: ' + (playerColor === 'w' ? '⚪ 흰색' : '⚫ 검은색'));
+          if (rolledOrder) parts.push('선공: ' + (firstMover === 'player' ? '나' : 'AI'));
+          statusBar.textContent = '🎲 ' + parts.join(' · ');
+        }
+
+        // AI가 먼저 두는 경우 자동으로 첫 수 진행
+        if (turn === aiColor) {
+          const thinkMsg = difficulty === 'hard' ? 'AI 가 깊이 생각 중...' : 'AI 가 생각 중...';
+          // 랜덤 안내를 잠깐 보여주고 AI 사고 메시지로 전환
+          const aiDelay = difficulty === 'hard' ? 50 : 400;
+          if (rolledColor || rolledOrder) {
+            setTimeout(() => { if (!gameOver) statusBar.textContent = thinkMsg; }, 1200);
+          } else {
+            statusBar.textContent = thinkMsg;
+          }
+          playerLocked = true;
+          setTimeout(aiMove, aiDelay);
+        }
+      }
+
+      const DIFF_DESC = {
+        easy:   '거의 무작위로 둡니다. 가끔 기물을 잡지만 자기 기물도 자주 흘립니다.',
+        normal: '한 수 앞을 내다보며 둡니다. 기물을 걸어두면 잘 잡아갑니다.',
+        hard:   '세 수 앞까지 계산합니다. 캡처 정렬·외통수 추적으로 강하게 둡니다.'
+      };
+      const diffDescEl = document.getElementById('diffDesc');
+      diffRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('.diff-btn');
+        if (!btn) return;
+        difficulty = btn.getAttribute('data-diff');
+        diffRow.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        if (diffDescEl) diffDescEl.textContent = DIFF_DESC[difficulty] || '';
+      });
+
+      // 색 선택
+      const colorRow = document.getElementById('colorRow');
+      if (colorRow) {
+        colorRow.addEventListener('click', (e) => {
+          const btn = e.target.closest('.diff-btn');
+          if (!btn) return;
+          colorIntent = btn.getAttribute('data-color'); // 'w' | 'b' | 'random'
+          colorRow.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      }
+
+      // 선공 선택
+      const orderRow = document.getElementById('orderRow');
+      if (orderRow) {
+        orderRow.addEventListener('click', (e) => {
+          const btn = e.target.closest('.diff-btn');
+          if (!btn) return;
+          orderIntent = btn.getAttribute('data-order'); // 'player' | 'ai' | 'random'
+          orderRow.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        });
+      }
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', () => showScreen(introScreen));
+      resignBtn.addEventListener('click', () => {
+        if (gameOver) return;
+        if (confirm('정말 기권하시겠습니까?')) resignGame();
+      });
+
+      const retryPlayBtn = document.getElementById('retryPlayBtn');
+      if (retryPlayBtn) {
+        retryPlayBtn.addEventListener('click', () => {
+          if (confirm('게임을 다시 시작하시겠습니까? 현재 진행 중인 게임은 초기화됩니다.')) {
+            showScreen(introScreen);
+          }
+        });
+      }
+
+      loadBest();
+    })();
+  </script>
+</body>
+</html>

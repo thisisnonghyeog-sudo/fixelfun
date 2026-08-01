@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>색깔 맞추기 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .color-intro, .color-play, .color-result { display: none; }
+    .color-intro.active, .color-play.active, .color-result.active { display: block; }
+
+    .color-intro {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .color-intro h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      font-size: 1.7rem;
+      margin-bottom: 24px;
+      text-shadow: 0 0 12px rgba(123, 47, 247, 0.7);
+    }
+    .color-intro p {
+      color: var(--text-secondary);
+      line-height: 1.8;
+      margin-bottom: 12px;
+    }
+    .color-intro .highlight {
+      color: var(--neon-yellow);
+      font-weight: 700;
+    }
+    .color-best {
+      color: var(--neon-yellow);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9rem;
+      margin: 20px 0;
+    }
+    .example-text {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.6rem;
+      margin: 14px 0;
+    }
+
+    .color-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    .hud-item {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-purple);
+      border-radius: 12px;
+      padding: 12px 18px;
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      box-shadow: 0 0 14px rgba(123, 47, 247, 0.25);
+    }
+    .hud-item .label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .hud-item .value {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.3rem;
+    }
+    .hud-item.timer .value { color: var(--neon-yellow); }
+    .hud-item.timer.warning .value { color: var(--neon-red); animation: pulse 0.6s infinite; }
+    .hud-item.combo .value { color: var(--neon-green); }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    .color-prompt {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-blue);
+      border-radius: 16px;
+      padding: 50px 20px;
+      text-align: center;
+      box-shadow: 0 0 24px rgba(0, 212, 255, 0.3);
+      margin-bottom: 24px;
+    }
+    .prompt-text {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 3rem;
+      letter-spacing: 4px;
+      margin: 0;
+      transition: transform 0.2s ease;
+    }
+    .prompt-instruction {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      margin-top: 14px;
+    }
+
+    .color-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      max-width: 500px;
+      margin: 0 auto;
+    }
+    .color-box {
+      aspect-ratio: 1.4 / 1;
+      border: 3px solid rgba(255, 255, 255, 0.15);
+      border-radius: 14px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .color-box:hover {
+      transform: translateY(-6px);
+      border-color: rgba(255, 255, 255, 0.5);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+    .color-box.flash-correct {
+      border-color: var(--neon-green) !important;
+      box-shadow: 0 0 30px var(--neon-green);
+      animation: flashGreen 0.4s;
+    }
+    .color-box.flash-wrong {
+      animation: flashRed 0.4s;
+    }
+    @keyframes flashGreen {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    @keyframes flashRed {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-10px); }
+      75% { transform: translateX(10px); }
+    }
+
+    .feedback {
+      min-height: 30px;
+      font-family: 'Press Start 2P', cursive;
+      margin-top: 18px;
+      font-size: 1rem;
+      text-align: center;
+    }
+    .feedback.correct { color: var(--neon-green); }
+    .feedback.wrong { color: var(--neon-red); }
+
+    .combo-floater {
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 2rem;
+      text-shadow: 0 0 18px var(--neon-yellow);
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.6s ease;
+      z-index: 10;
+    }
+    .combo-floater.show { opacity: 1; top: 25%; }
+
+    .color-result {
+      text-align: center;
+      padding: 30px 20px;
+    }
+    .grade-badge {
+      display: inline-block;
+      width: 160px;
+      height: 160px;
+      line-height: 160px;
+      border-radius: 50%;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 4rem;
+      margin: 20px 0;
+      border: 4px solid currentColor;
+    }
+    .grade-S { color: var(--neon-yellow); box-shadow: 0 0 36px var(--neon-yellow); }
+    .grade-A { color: var(--neon-green); box-shadow: 0 0 30px var(--neon-green); }
+    .grade-B { color: var(--neon-blue); box-shadow: 0 0 24px var(--neon-blue); }
+    .grade-C { color: var(--neon-red); box-shadow: 0 0 20px var(--neon-red); }
+
+    .result-stats {
+      margin: 24px 0;
+      color: var(--text-secondary);
+    }
+    .result-stats .big {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.6rem;
+      display: block;
+      margin: 6px 0;
+    }
+    .new-record {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 1.1rem;
+      margin: 14px 0;
+      animation: pulse 1s infinite;
+    }
+    .result-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 600px) {
+      .prompt-text { font-size: 2rem; }
+      .grade-badge { width: 120px; height: 120px; line-height: 120px; font-size: 3rem; }
+      .color-grid { gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">색깔 맞추기</span>
+  </nav>
+
+  <main class="game-container">
+    <section class="color-intro active" id="introScreen">
+      <h1>색깔 맞추기</h1>
+      <p>스트룹 효과 게임! 60초 안에 최대한 많이 맞추세요.</p>
+      <p>화면에 표시된 <span class="highlight">단어의 글자색</span>과 같은 색의 박스를 클릭하세요.</p>
+      <p>(단어의 의미가 아닌, <span class="highlight">글자의 색깔</span>을 보세요!)</p>
+      <p class="example-text" style="color: var(--neon-blue);">빨강</p>
+      <p style="font-size: 0.9rem;">예시: 위 단어는 <strong style="color: var(--neon-blue);">파란색</strong>으로 쓰여 있으므로 정답은 <strong style="color: var(--neon-blue);">파랑</strong>입니다!</p>
+      <div class="color-best" id="introBest">최고 기록: 0</div>
+      <button class="btn-primary" id="startBtn">게임 시작</button>
+    </section>
+
+    <section class="color-play" id="playScreen">
+      <div class="color-hud">
+        <div class="hud-item timer" id="timerBox">
+          <span class="label">남은 시간</span>
+          <span class="value" id="timerVal">60</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">점수</span>
+          <span class="value" id="scoreVal">0</span>
+        </div>
+        <div class="hud-item combo">
+          <span class="label">콤보</span>
+          <span class="value" id="comboVal">0</span>
+        </div>
+      </div>
+
+      <div class="color-prompt">
+        <p class="prompt-text" id="promptText">-</p>
+        <p class="prompt-instruction">↑ 단어의 <strong>글자색</strong>과 같은 박스를 클릭!</p>
+      </div>
+
+      <div class="color-grid" id="colorGrid"></div>
+      <div class="feedback" id="feedback"></div>
+    </section>
+
+    <section class="color-result" id="resultScreen">
+      <h2 style="font-family:'Press Start 2P', cursive; color: var(--neon-purple);">결과</h2>
+      <div class="grade-badge" id="gradeBadge">-</div>
+      <div class="result-stats">
+        <span>정답 수</span>
+        <span class="big" id="finalScore">0</span>
+        <span>정답률 <span id="accuracy">0%</span></span>
+      </div>
+      <div class="new-record" id="newRecord" style="display:none;">🎉 신기록!</div>
+      <div class="result-buttons">
+        <button class="btn-primary" id="retryBtn">다시하기</button>
+        <a href="../index.html" class="btn-secondary">홈으로</a>
+      </div>
+    </section>
+  </main>
+
+  <div class="combo-floater" id="comboFloater"></div>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function() {
+      const COLORS = [
+        { name: '빨강',  hex: '#ff4757' },
+        { name: '파랑',  hex: '#1e90ff' },
+        { name: '초록',  hex: '#2ed573' },
+        { name: '노랑',  hex: '#ffd700' },
+        { name: '보라',  hex: '#9b59b6' },
+        { name: '주황',  hex: '#ff8c1a' },
+        { name: '분홍',  hex: '#ff6ec7' }
+      ];
+
+      const introScreen = document.getElementById('introScreen');
+      const playScreen = document.getElementById('playScreen');
+      const resultScreen = document.getElementById('resultScreen');
+      const startBtn = document.getElementById('startBtn');
+      const retryBtn = document.getElementById('retryBtn');
+      const timerVal = document.getElementById('timerVal');
+      const timerBox = document.getElementById('timerBox');
+      const scoreVal = document.getElementById('scoreVal');
+      const comboVal = document.getElementById('comboVal');
+      const promptText = document.getElementById('promptText');
+      const colorGrid = document.getElementById('colorGrid');
+      const feedback = document.getElementById('feedback');
+      const introBest = document.getElementById('introBest');
+      const gradeBadge = document.getElementById('gradeBadge');
+      const finalScore = document.getElementById('finalScore');
+      const accuracy = document.getElementById('accuracy');
+      const newRecord = document.getElementById('newRecord');
+      const comboFloater = document.getElementById('comboFloater');
+
+      let timeLeft = 60;
+      let score = 0;
+      let combo = 0;
+      let totalAttempts = 0;
+      let timerId = null;
+      let correctColor = null;
+      let locked = false;
+
+      function showScreen(target) {
+        [introScreen, playScreen, resultScreen].forEach(s => s.classList.remove('active'));
+        target.classList.add('active');
+      }
+
+      function loadBest() {
+        const best = parseInt(localStorage.getItem('pixelfun_color_best') || '0', 10);
+        introBest.textContent = `최고 기록: ${best}`;
+      }
+
+      function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      function nextRound() {
+        // 단어의 의미와 글자색이 다르도록
+        const wordIdx = Math.floor(Math.random() * COLORS.length);
+        let colorIdx;
+        do {
+          colorIdx = Math.floor(Math.random() * COLORS.length);
+        } while (colorIdx === wordIdx);
+
+        const wordObj = COLORS[wordIdx];
+        const colorObj = COLORS[colorIdx];
+        correctColor = colorObj;
+
+        // 표시: 단어 텍스트는 wordObj.name, 글자색은 colorObj.hex
+        promptText.textContent = wordObj.name;
+        promptText.style.color = colorObj.hex;
+        promptText.style.textShadow = `0 0 18px ${colorObj.hex}`;
+
+        // 4개 박스: 정답(글자색)을 포함, 나머지는 다른 색에서 랜덤
+        const others = COLORS.filter(c => c.name !== colorObj.name);
+        const picks = shuffle(others).slice(0, 3);
+        const choices = shuffle([colorObj, ...picks]);
+
+        colorGrid.innerHTML = '';
+        choices.forEach(c => {
+          const box = document.createElement('div');
+          box.className = 'color-box';
+          box.style.background = c.hex;
+          box.dataset.name = c.name;
+          box.addEventListener('click', () => onClick(box, c));
+          colorGrid.appendChild(box);
+        });
+
+        feedback.textContent = '';
+        feedback.className = 'feedback';
+        locked = false;
+      }
+
+      function showCombo(n) {
+        comboFloater.textContent = n + 'x COMBO!';
+        comboFloater.classList.add('show');
+        setTimeout(() => comboFloater.classList.remove('show'), 600);
+      }
+
+      function onClick(box, picked) {
+        if (locked || timeLeft <= 0) return;
+        locked = true;
+        totalAttempts++;
+        if (picked.name === correctColor.name) {
+          combo++;
+          let gained = 1;
+          if (combo >= 5) gained += Math.floor(combo / 5);
+          score += gained;
+          if (window.PixelSound) PixelSound.play('success');
+          box.classList.add('flash-correct');
+          feedback.textContent = '정답! +' + gained;
+          feedback.className = 'feedback correct';
+          if (combo >= 2) showCombo(combo);
+        } else {
+          combo = 0;
+          if (window.PixelSound) PixelSound.play('fail');
+          box.classList.add('flash-wrong');
+          feedback.textContent = '오답! 정답: ' + correctColor.name;
+          feedback.className = 'feedback wrong';
+        }
+        scoreVal.textContent = score;
+        comboVal.textContent = combo;
+        setTimeout(nextRound, 450);
+      }
+
+      function tick() {
+        timeLeft--;
+        timerVal.textContent = timeLeft;
+        if (timeLeft <= 5) timerBox.classList.add('warning');
+        if (timeLeft <= 0) endGame();
+      }
+
+      function getGrade(s) {
+        if (s >= 30) return 'S';
+        if (s >= 22) return 'A';
+        if (s >= 12) return 'B';
+        return 'C';
+      }
+
+      function startGame() {
+        timeLeft = 60;
+        score = 0;
+        combo = 0;
+        totalAttempts = 0;
+        timerVal.textContent = '60';
+        scoreVal.textContent = '0';
+        comboVal.textContent = '0';
+        timerBox.classList.remove('warning');
+        if (window.PixelSound) PixelSound.play('start');
+        showScreen(playScreen);
+        nextRound();
+        timerId = setInterval(tick, 1000);
+      }
+
+      function endGame() {
+        clearInterval(timerId);
+        locked = true;
+        if (window.PixelSound) PixelSound.play('clear');
+        const best = parseInt(localStorage.getItem('pixelfun_color_best') || '0', 10);
+        const isNewRecord = score > best;
+        if (isNewRecord) localStorage.setItem('pixelfun_color_best', score);
+
+        const grade = getGrade(score);
+        gradeBadge.textContent = grade;
+        gradeBadge.className = 'grade-badge grade-' + grade;
+        finalScore.textContent = score;
+        const acc = totalAttempts === 0 ? 0 : Math.round((score / totalAttempts) * 100);
+        accuracy.textContent = acc + '%';
+        newRecord.style.display = isNewRecord ? 'block' : 'none';
+
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: { game: 'color', score: score, grade: grade, isNewRecord: isNewRecord }
+        }));
+        showScreen(resultScreen);
+      }
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+
+      loadBest();
+    })();
+  </script>
+</body>
+</html>

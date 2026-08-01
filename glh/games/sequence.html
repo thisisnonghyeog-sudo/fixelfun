@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>시퀀스 마스터 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .seq-intro, .seq-play, .seq-result { display: none; }
+    .seq-intro.active, .seq-play.active, .seq-result.active { display: block; }
+
+    .seq-intro { text-align: center; padding: 40px 20px; }
+    .seq-intro h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      font-size: 1.6rem; line-height: 1.5; margin-bottom: 24px;
+      text-shadow: 0 0 14px rgba(123, 47, 247, 0.8);
+    }
+    .seq-intro p { color: var(--text-secondary); line-height: 1.8; margin-bottom: 12px; }
+    .seq-rules {
+      text-align: left; max-width: 460px; margin: 0 auto 20px;
+      background: var(--bg-card); border: 2px solid var(--neon-purple);
+      border-radius: 12px; padding: 16px 20px;
+    }
+    .seq-rules li { color: var(--text-secondary); line-height: 1.9; margin-left: 4px; }
+    .seq-rules b { color: var(--neon-yellow); }
+    .seq-boss-tag {
+      display: inline-block; font-family: 'Press Start 2P', cursive; font-size: 0.7rem;
+      color: var(--neon-yellow); border: 2px solid var(--neon-yellow); border-radius: 8px;
+      padding: 8px 14px; margin-bottom: 20px;
+      box-shadow: 0 0 16px rgba(255, 215, 0, 0.4); animation: bosspulse 1.4s infinite;
+    }
+    @keyframes bosspulse {
+      0%, 100% { box-shadow: 0 0 16px rgba(255, 215, 0, 0.4); }
+      50% { box-shadow: 0 0 28px rgba(255, 215, 0, 0.8); }
+    }
+    .seq-best { color: var(--neon-yellow); font-family: 'Press Start 2P', cursive; font-size: 0.9rem; margin: 20px 0; }
+
+    /* 난이도 선택 */
+    .diff-select { margin: 8px 0 18px; }
+    .diff-select .diff-label { display: block; color: var(--text-secondary); font-size: 0.8rem; margin-bottom: 12px; }
+    .seq-diff {
+      font-family: 'Press Start 2P', cursive; font-size: 0.7rem;
+      background: var(--bg-card); color: var(--text-secondary);
+      border: 2px solid var(--neon-purple); border-radius: 8px;
+      padding: 10px 14px; margin: 0 5px; cursor: pointer; transition: all 0.2s ease;
+    }
+    .seq-diff:hover { color: var(--text-primary); }
+    .seq-diff.active {
+      color: var(--bg-main); background: var(--neon-purple);
+      box-shadow: 0 0 14px rgba(123, 47, 247, 0.5);
+    }
+
+    /* 보스 헤더 */
+    .boss-bar {
+      display: flex; align-items: center; gap: 14px;
+      background: var(--bg-card); border: 2px solid var(--neon-red);
+      border-radius: 14px; padding: 12px 16px; margin-bottom: 18px;
+      box-shadow: 0 0 16px rgba(255, 71, 87, 0.25);
+      transition: border-color 0.4s ease, box-shadow 0.4s ease;
+    }
+    .boss-face { font-size: 2.4rem; line-height: 1; filter: drop-shadow(0 0 8px currentColor); }
+    .boss-info { flex: 1; }
+    .boss-name {
+      font-family: 'Press Start 2P', cursive; font-size: 0.85rem; color: var(--text-primary);
+      margin-bottom: 8px; display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    }
+    .boss-phase { color: var(--neon-yellow); font-size: 0.7rem; }
+    .hp-track { height: 14px; background: #2a0a12; border-radius: 8px; overflow: hidden; border: 1px solid rgba(255,255,255,0.12); }
+    .hp-fill {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg, var(--neon-red), #ff8c00);
+      transition: width 0.5s ease; border-radius: 8px;
+    }
+
+    .seq-hud { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+    .hud-item {
+      background: var(--bg-card); border: 2px solid var(--neon-purple); border-radius: 12px;
+      padding: 10px 14px; flex: 1; min-width: 90px; text-align: center;
+      box-shadow: 0 0 14px rgba(123, 47, 247, 0.25);
+    }
+    .hud-item .label { display: block; font-size: 0.72rem; color: var(--text-secondary); margin-bottom: 6px; }
+    .hud-item .value { font-family: 'Press Start 2P', cursive; color: var(--neon-blue); font-size: 1.2rem; }
+    .hud-item.level .value { color: var(--neon-yellow); }
+
+    /* 모디파이어 배너 */
+    .seq-modifier {
+      text-align: center; font-family: 'Press Start 2P', cursive; font-size: 0.85rem;
+      min-height: 22px; margin-bottom: 10px; letter-spacing: 1px; color: var(--neon-green);
+    }
+    .seq-modifier.reverse { color: var(--neon-red); animation: pulse 0.6s infinite; }
+    @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.08);} }
+
+    .seq-status {
+      text-align: center; font-family: 'Press Start 2P', cursive; font-size: 1rem;
+      min-height: 26px; margin-bottom: 12px; color: var(--neon-blue); letter-spacing: 1px;
+    }
+    .seq-status.watch { color: var(--neon-yellow); }
+    .seq-status.go { color: var(--neon-green); }
+    .seq-status.bad { color: var(--neon-red); }
+
+    /* 입력 제한시간 바 */
+    .timer-track {
+      height: 10px; background: #11112a; border-radius: 6px; overflow: hidden;
+      margin: 0 auto 16px; max-width: 420px; border: 1px solid rgba(255,255,255,0.1);
+      opacity: 0; transition: opacity 0.2s ease;
+    }
+    .timer-track.show { opacity: 1; }
+    .timer-fill {
+      height: 100%; width: 100%;
+      background: linear-gradient(90deg, var(--neon-green), var(--neon-yellow));
+      border-radius: 6px;
+    }
+    .timer-fill.danger { background: linear-gradient(90deg, var(--neon-red), #ff8c00); }
+
+    .pad-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; max-width: 420px; margin: 0 auto; }
+    .pad {
+      aspect-ratio: 1 / 1; border-radius: 14px; border: 3px solid rgba(255,255,255,0.15);
+      background: var(--bg-card); cursor: pointer;
+      transition: transform 0.08s ease, filter 0.15s ease;
+      filter: brightness(0.5); touch-action: manipulation; user-select: none;
+    }
+    .pad:focus { outline: none; }
+    .pad.lit { filter: brightness(1.7); transform: scale(1.05); }
+    .pad.c0 { background: var(--neon-purple); box-shadow: 0 0 18px var(--neon-purple); }
+    .pad.c1 { background: var(--neon-blue);   box-shadow: 0 0 18px var(--neon-blue); }
+    .pad.c2 { background: var(--neon-yellow); box-shadow: 0 0 18px var(--neon-yellow); }
+    .pad.c3 { background: var(--neon-green);  box-shadow: 0 0 18px var(--neon-green); }
+    .pad.c4 { background: var(--neon-red);    box-shadow: 0 0 18px var(--neon-red); }
+    .pad.c5 { background: #ff8c00;            box-shadow: 0 0 18px #ff8c00; }
+    .pad.c6 { background: #ff3fa4;            box-shadow: 0 0 18px #ff3fa4; }
+    .pad.c7 { background: #1ee0c0;            box-shadow: 0 0 18px #1ee0c0; }
+    .pad.c8 { background: #b388ff;            box-shadow: 0 0 18px #b388ff; }
+    .pad-grid.locked-input .pad { cursor: not-allowed; }
+
+    .seq-result { text-align: center; padding: 30px 20px; }
+    .grade-badge {
+      display: inline-block; width: 160px; height: 160px; line-height: 160px; border-radius: 50%;
+      font-family: 'Press Start 2P', cursive; font-size: 4rem; margin: 20px 0; border: 4px solid currentColor;
+    }
+    .grade-S { color: var(--neon-yellow); box-shadow: 0 0 36px var(--neon-yellow); }
+    .grade-A { color: var(--neon-green); box-shadow: 0 0 30px var(--neon-green); }
+    .grade-B { color: var(--neon-blue); box-shadow: 0 0 24px var(--neon-blue); }
+    .grade-C { color: var(--neon-red); box-shadow: 0 0 20px var(--neon-red); }
+    .victory-msg {
+      font-family: 'Press Start 2P', cursive; color: var(--neon-yellow); font-size: 1.1rem;
+      line-height: 1.6; margin: 10px 0 4px; animation: bosspulse 1s infinite;
+    }
+    .result-stats { margin: 20px 0; color: var(--text-secondary); }
+    .result-stats .big {
+      font-family: 'Press Start 2P', cursive; color: var(--neon-blue); font-size: 1.6rem; display: block; margin: 6px 0;
+    }
+    .new-record { font-family: 'Press Start 2P', cursive; color: var(--neon-yellow); font-size: 1.05rem; margin: 12px 0; animation: bosspulse 1s infinite; }
+    .result-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+    .result-buttons .btn-primary, .result-buttons .btn-secondary { min-width: 140px; }
+
+    @media (max-width: 600px) {
+      .seq-intro h1 { font-size: 1.2rem; }
+      .grade-badge { width: 120px; height: 120px; line-height: 120px; font-size: 3rem; }
+      .hud-item .value { font-size: 1rem; }
+      .pad-grid { gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">👾 시퀀스 마스터</span>
+  </nav>
+
+  <main class="game-container">
+    <!-- 인트로 -->
+    <section class="seq-intro active" id="introScreen">
+      <div class="seq-boss-tag">★ 히든 보스 ★</div>
+      <h1>시퀀스 마스터</h1>
+      <p>빛나는 순서를 기억해 똑같이 따라 눌러 보세요. 보스의 HP를 모두 깎으면 승리합니다!</p>
+      <ul class="seq-rules">
+        <li>⏱️ 입력에는 <b>제한 시간</b>이 있습니다. 시간 초과 시 패배!</li>
+        <li>🔁 일정 레벨부터 <b>역순!</b> — 순서를 <b>거꾸로</b> 눌러야 합니다.</li>
+        <li>⚡ 레벨이 오를수록 순서는 길어지고 점멸은 빨라집니다.</li>
+        <li>💀 보스는 <b>3페이즈</b>, <b>15레벨</b>을 돌파하면 처치!</li>
+      </ul>
+      <div class="diff-select" id="diffSelect">
+        <span class="diff-label">난이도 선택</span>
+        <button class="seq-diff" data-diff="easy">쉬움</button>
+        <button class="seq-diff active" data-diff="normal">보통</button>
+        <button class="seq-diff" data-diff="hard">어려움</button>
+      </div>
+      <div class="seq-best" id="introBest">최고 기록: 0 레벨</div>
+      <button class="btn-primary" id="startBtn">도전 시작</button>
+    </section>
+
+    <!-- 플레이 -->
+    <section class="seq-play" id="playScreen">
+      <div class="boss-bar" id="bossBar">
+        <div class="boss-face" id="bossFace">👾</div>
+        <div class="boss-info">
+          <div class="boss-name">
+            <span id="bossName">시퀀스 마스터</span>
+            <span class="boss-phase" id="bossPhase">PHASE 1</span>
+          </div>
+          <div class="hp-track"><div class="hp-fill" id="hpFill"></div></div>
+        </div>
+      </div>
+
+      <div class="seq-hud">
+        <div class="hud-item level">
+          <span class="label">레벨</span>
+          <span class="value" id="levelVal">1</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">목숨</span>
+          <span class="value" id="livesVal">3</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">순서 길이</span>
+          <span class="value" id="lenVal">3</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">최고</span>
+          <span class="value" id="bestVal">0</span>
+        </div>
+      </div>
+
+      <div class="seq-modifier" id="modifierText"></div>
+      <div class="seq-status watch" id="statusText">잘 보세요...</div>
+      <div class="timer-track" id="timerTrack"><div class="timer-fill" id="timerFill"></div></div>
+
+      <div class="pad-grid" id="padGrid"></div>
+    </section>
+
+    <!-- 결과 -->
+    <section class="seq-result" id="resultScreen">
+      <h2 style="font-family:'Press Start 2P', cursive; color: var(--neon-purple);" id="resultTitle">결과</h2>
+      <div class="victory-msg" id="victoryMsg" style="display:none;">⚔️ 보스 처치! ⚔️</div>
+      <div class="grade-badge" id="gradeBadge">-</div>
+      <div class="result-stats">
+        <span>도달 레벨</span>
+        <span class="big" id="finalLevel">0</span>
+        <span id="failReason">기억한 순서 <span id="finalLen">0</span>칸</span>
+      </div>
+      <div class="new-record" id="newRecord" style="display:none;">🎉 신기록!</div>
+      <div class="result-buttons">
+        <button class="btn-primary" id="retryBtn">다시 도전</button>
+        <a href="../index.html" class="btn-secondary">홈으로</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function () {
+      const $ = function (id) { return document.getElementById(id); };
+      const introScreen = $('introScreen'), playScreen = $('playScreen'), resultScreen = $('resultScreen');
+      const startBtn = $('startBtn'), retryBtn = $('retryBtn');
+      const levelVal = $('levelVal'), lenVal = $('lenVal'), bestVal = $('bestVal');
+      const statusText = $('statusText'), modifierText = $('modifierText');
+      const padGrid = $('padGrid'), introBest = $('introBest');
+      const bossFace = $('bossFace'), bossPhase = $('bossPhase'), bossBar = $('bossBar'), hpFill = $('hpFill');
+      const timerTrack = $('timerTrack'), timerFill = $('timerFill');
+      const gradeBadge = $('gradeBadge'), finalLevel = $('finalLevel'), finalLen = $('finalLen');
+      const newRecord = $('newRecord'), resultTitle = $('resultTitle'), victoryMsg = $('victoryMsg'), failReason = $('failReason');
+
+      const PAD_COUNT = 9;      // 3x3 보스 그리드
+      const BOSS_MAX = 15;      // 15레벨 돌파 시 보스 처치
+      const MAX_LIVES = 3;
+
+      const PHASES = [
+        { face: '👾', color: 'var(--neon-purple)', name: '시퀀스 마스터' },
+        { face: '👹', color: 'var(--neon-blue)',   name: '폭주한 시퀀서' },
+        { face: '😈', color: 'var(--neon-red)',    name: '카오스 마스터' }
+      ];
+
+      let pads = [];
+      let sequence = [];        // 보여준 순서
+      let expected = [];        // 입력해야 할 순서(역순이면 뒤집힘)
+      let inputIndex = 0;
+      let level = 1;            // 현재 플레이 중인 레벨
+      let cleared = 0;          // 클리어한 레벨 수
+      let lives = MAX_LIVES;
+      let roundReverse = false;
+      let acceptingInput = false;
+      let flashTimer = null, inputTimer = null;
+
+      // 패드 생성
+      for (let i = 0; i < PAD_COUNT; i++) {
+        const p = document.createElement('div');
+        p.className = 'pad c' + i;
+        p.setAttribute('data-idx', i);
+        padGrid.appendChild(p);
+        pads.push(p);
+        p.addEventListener('click', function () { handlePad(i); });
+      }
+
+      function showScreen(t) {
+        [introScreen, playScreen, resultScreen].forEach(s => s.classList.remove('active'));
+        t.classList.add('active');
+      }
+
+      function loadBest() {
+        const best = parseInt(localStorage.getItem('pixelfun_sequence_best') || '0', 10);
+        introBest.textContent = `최고 기록: ${best} 레벨`;
+        bestVal.textContent = best;
+        return best;
+      }
+
+      function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+
+      function phaseIndex() {
+        if (cleared >= 10) return 2;
+        if (cleared >= 5) return 1;
+        return 0;
+      }
+      // 난이도 프리셋 (점멸 속도/입력시간/역순 확률 배율)
+      const DIFFS = {
+        easy:   { label: '쉬움',   flashMul: 1.35, gapMul: 1.30, timeMul: 1.40, revMul: 0   },
+        normal: { label: '보통',   flashMul: 1.00, gapMul: 1.00, timeMul: 1.00, revMul: 1.0 },
+        hard:   { label: '어려움', flashMul: 0.65, gapMul: 0.70, timeMul: 0.70, revMul: 1.6 }
+      };
+      let difficulty = 'normal';
+      function diff() { return DIFFS[difficulty] || DIFFS.normal; }
+
+      function reverseChance() {
+        const base = level >= 11 ? 0.5 : level >= 6 ? 0.3 : level >= 3 ? 0.15 : 0;
+        return Math.min(0.7, base * diff().revMul);
+      }
+      function flashDuration() { return Math.max(130, (520 - level * 24) * diff().flashMul); }
+      function gapDuration() { return Math.max(70, (240 - level * 10) * diff().gapMul); }
+      // 패턴이 길수록 입력 시간을 더 길게 (칸당 +0.9초, 난이도 배율 적용)
+      function inputTimeMs() { return Math.round((2500 + sequence.length * 900) * diff().timeMul); }
+
+      function updateBossUI() {
+        livesVal.textContent = lives;
+        const ph = PHASES[phaseIndex()];
+        bossFace.textContent = ph.face;
+        bossPhase.textContent = 'PHASE ' + (phaseIndex() + 1);
+        $('bossName').textContent = ph.name;
+        bossBar.style.borderColor = ph.color;
+        bossFace.style.color = ph.color;
+        const hp = Math.max(0, (BOSS_MAX - cleared) / BOSS_MAX) * 100;
+        hpFill.style.width = hp + '%';
+      }
+
+      function lightPad(idx, dur) {
+        return new Promise(resolve => {
+          const pad = pads[idx];
+          pad.classList.add('lit');
+          if (window.PixelSound) PixelSound.play('flip');
+          flashTimer = setTimeout(() => {
+            pad.classList.remove('lit');
+            flashTimer = setTimeout(resolve, gapDuration());
+          }, dur);
+        });
+      }
+
+      // 입력 제한시간 바
+      function startInputTimer() {
+        const total = inputTimeMs();
+        let left = total;
+        timerTrack.classList.add('show');
+        timerFill.style.width = '100%';
+        timerFill.classList.remove('danger');
+        const step = 50;
+        inputTimer = setInterval(() => {
+          left -= step;
+          const pct = Math.max(0, (left / total) * 100);
+          timerFill.style.width = pct + '%';
+          if (pct <= 30) timerFill.classList.add('danger');
+          if (left <= 0) {
+            stopInputTimer();
+            fail('시간 초과!');
+          }
+        }, step);
+      }
+      function stopInputTimer() {
+        clearInterval(inputTimer); inputTimer = null;
+        timerTrack.classList.remove('show');
+      }
+
+      function startInputRetry() {
+        inputIndex = 0;
+        acceptingInput = false;
+        padGrid.classList.add('locked-input');
+        timerTrack.classList.remove('show');
+        setTimeout(function () {
+          acceptingInput = true;
+          padGrid.classList.remove('locked-input');
+          statusText.textContent = roundReverse ? '거꾸로 입력!' : '따라 누르세요!';
+          statusText.className = 'seq-status go';
+          startInputTimer();
+        }, 700);
+      }
+
+      async function playSequence() {
+        acceptingInput = false;
+        padGrid.classList.add('locked-input');
+        timerTrack.classList.remove('show');
+        updateBossUI();
+
+        // 이번 라운드 역순 여부 결정
+        roundReverse = Math.random() < reverseChance();
+        // 역순 라운드: 시연을 거꾸로 보여주고, 입력은 원래(정방향) 순서로 받음
+        const displayOrder = roundReverse ? sequence.slice().reverse() : sequence.slice();
+        expected = sequence.slice();
+        modifierText.textContent = roundReverse ? '🔁 역순! 거꾸로 누르세요' : '▶ 정방향';
+        modifierText.className = 'seq-modifier' + (roundReverse ? ' reverse' : '');
+
+        statusText.textContent = '잘 보세요...';
+        statusText.className = 'seq-status watch';
+        await new Promise(r => setTimeout(r, 650));
+
+        const dur = flashDuration();
+        for (let i = 0; i < displayOrder.length; i++) {
+          await lightPad(displayOrder[i], dur);
+        }
+
+        acceptingInput = true;
+        inputIndex = 0;
+        padGrid.classList.remove('locked-input');
+        statusText.textContent = roundReverse ? '거꾸로 입력!' : '따라 누르세요!';
+        statusText.className = 'seq-status go';
+        startInputTimer();
+      }
+
+      function nextLevel() {
+        level = cleared + 1;
+        // 페이즈 2(레벨6)·페이즈 3(레벨11) 진입 시 눌러야 할 칸 수를 3으로 초기화
+        const phaseStart = (cleared === 5 || cleared === 10);
+        if (sequence.length === 0 || phaseStart) {
+          sequence = [];
+          for (let i = 0; i < 3; i++) sequence.push(randInt(0, PAD_COUNT - 1));
+        } else {
+          sequence.push(randInt(0, PAD_COUNT - 1));
+        }
+        levelVal.textContent = level;
+        lenVal.textContent = sequence.length;
+        playSequence();
+      }
+
+      function flashFeedback(idx) {
+        const pad = pads[idx];
+        pad.classList.add('lit');
+        setTimeout(() => pad.classList.remove('lit'), 160);
+      }
+
+      function handlePad(idx) {
+        if (!acceptingInput) return;
+        if (idx === expected[inputIndex]) {
+          flashFeedback(idx);
+          if (window.PixelSound) PixelSound.play('flip');
+          inputIndex++;
+          if (inputIndex >= expected.length) {
+            // 레벨 클리어
+            acceptingInput = false;
+            stopInputTimer();
+            cleared++;
+            if (window.PixelSound) PixelSound.play('success');
+            updateBossUI();
+            if (cleared >= BOSS_MAX) {
+              statusText.textContent = '보스 처치!!';
+              statusText.className = 'seq-status go';
+              setTimeout(() => endGame(true), 700);
+              return;
+            }
+            statusText.textContent = '레벨 ' + level + ' 클리어!';
+            statusText.className = 'seq-status go';
+            setTimeout(nextLevel, 650);
+          }
+        } else {
+          fail('틀렸습니다!');
+          const pad = pads[idx];
+          pad.classList.add('lit');
+          setTimeout(() => pad.classList.remove('lit'), 300);
+        }
+      }
+
+      function fail(reason) {
+        acceptingInput = false;
+        stopInputTimer();
+        clearTimeout(flashTimer);
+        if (window.PixelSound) PixelSound.play('fail');
+        lives -= 1;
+        if (lives > 0) {
+          updateBossUI();
+          statusText.textContent = reason + ' 남은 목숨 ' + lives + '개';
+          statusText.className = 'seq-status bad';
+          setTimeout(() => {
+            if (roundReverse) {
+              statusText.textContent = '다시 시퀀스를 확인하세요.';
+            }
+            startInputRetry();
+          }, 850);
+        } else {
+          updateBossUI();
+          statusText.textContent = reason;
+          statusText.className = 'seq-status bad';
+          setTimeout(() => endGame(false), 850);
+        }
+      }
+
+      function getGrade(lv) {
+        if (lv >= 12) return 'S';
+        if (lv >= 8) return 'A';
+        if (lv >= 5) return 'B';
+        return 'C';
+      }
+
+      function startGame() {
+        clearTimeout(flashTimer);
+        stopInputTimer();
+        sequence = []; expected = [];
+        inputIndex = 0; level = 1; cleared = 0; lives = MAX_LIVES;
+        acceptingInput = false;
+        loadBest();
+        updateBossUI();
+        modifierText.textContent = '';
+        if (window.PixelSound) PixelSound.play('start');
+        showScreen(playScreen);
+        nextLevel();
+      }
+
+      function endGame(victory) {
+        clearTimeout(flashTimer);
+        stopInputTimer();
+        acceptingInput = false;
+        if (window.PixelSound) PixelSound.play('clear');
+
+        const reached = cleared; // 처치한 레벨 수
+        const best = parseInt(localStorage.getItem('pixelfun_sequence_best') || '0', 10);
+        const isNewRecord = reached > best;
+        if (isNewRecord) localStorage.setItem('pixelfun_sequence_best', reached);
+
+        const grade = victory ? 'S' : getGrade(reached);
+        gradeBadge.textContent = grade;
+        gradeBadge.className = 'grade-badge grade-' + grade;
+        finalLevel.textContent = reached;
+        finalLen.textContent = sequence.length;
+
+        resultTitle.textContent = victory ? '승리!' : '결과';
+        victoryMsg.style.display = victory ? 'block' : 'none';
+        failReason.style.display = victory ? 'none' : 'block';
+        newRecord.style.display = isNewRecord ? 'block' : 'none';
+
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: {
+            game: 'sequence',
+            score: reached,
+            grade: grade,
+            outcome: victory ? 'win' : 'lose',
+            isNewRecord: isNewRecord
+          }
+        }));
+        showScreen(resultScreen);
+      }
+
+      // 난이도 선택
+      const diffBtns = Array.prototype.slice.call(document.querySelectorAll('.seq-diff'));
+      function setDifficulty(d) {
+        if (!DIFFS[d]) d = 'normal';
+        difficulty = d;
+        diffBtns.forEach(b => b.classList.toggle('active', b.getAttribute('data-diff') === d));
+        try { localStorage.setItem('pixelfun_sequence_diff', d); } catch (e) {}
+      }
+      diffBtns.forEach(b => b.addEventListener('click', () => setDifficulty(b.getAttribute('data-diff'))));
+      try { setDifficulty(localStorage.getItem('pixelfun_sequence_diff') || 'normal'); } catch (e) { setDifficulty('normal'); }
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+
+      loadBest();
+    })();
+  </script>
+</body>
+</html>

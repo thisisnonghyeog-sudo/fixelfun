@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="PixelFun - 두뇌를 깨우는 레트로 픽셀 미니게임 모음" />
+  <meta name="theme-color" content="#0a0a1a" />
+  <title>PixelFun - 두뇌를 깨우는 미니게임 모음</title>
+
+  <!-- 구글 폰트: Press Start 2P (픽셀) + Noto Sans KR (본문) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- 공통 스타일 -->
+  <link rel="stylesheet" href="style.css" />
+
+  <!-- 히든 게임(잠금 카드) 전용 스타일 -->
+  <style>
+    .secret-card {
+      position: relative;
+      overflow: hidden;
+      border-color: var(--neon-yellow) !important;
+    }
+    .secret-card.unlocked {
+      box-shadow: 0 0 22px rgba(255, 215, 0, 0.45);
+      animation: secretGlow 1.6s infinite;
+    }
+    #finalSecretGameCard {
+      border-color: var(--neon-red) !important;
+    }
+    #finalSecretGameCard.unlocked {
+      box-shadow: 0 0 26px rgba(255, 71, 87, 0.55), 0 0 44px rgba(255, 71, 87, 0.28);
+      animation: finalSecretGlow 1.2s infinite;
+    }
+    @keyframes secretGlow {
+      0%, 100% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.35); }
+      50% { box-shadow: 0 0 36px rgba(255, 215, 0, 0.8); }
+    }
+    @keyframes finalSecretGlow {
+      0%, 100% { box-shadow: 0 0 22px rgba(255, 71, 87, 0.4), 0 0 48px rgba(255, 71, 87, 0.24); }
+      50% { box-shadow: 0 0 36px rgba(255, 71, 87, 0.82), 0 0 60px rgba(255, 71, 87, 0.34); }
+    }
+    /* 잠금 오버레이 */
+    .lock-overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      text-align: center;
+      padding: 16px;
+      background: rgba(10, 10, 26, 0.88);
+      backdrop-filter: blur(3px);
+      z-index: 2;
+      transition: opacity 0.4s ease;
+    }
+    .secret-card.unlocked .lock-overlay {
+      opacity: 0;
+      pointer-events: none;
+    }
+    .lock-emoji {
+      font-size: 2.6rem;
+      filter: drop-shadow(0 0 10px rgba(255, 215, 0, 0.6));
+    }
+    .lock-text {
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .lock-progress {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 0.85rem;
+      margin-top: 4px;
+    }
+    /* 잠금 상태일 때 카드 클릭 막기 */
+    .secret-card.locked {
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+    /* 오버레이 자체는 잠금 안내 툴팁을 위해 포인터 허용 */
+    .secret-card.locked .lock-overlay { pointer-events: auto; }
+  </style>
+</head>
+<body>
+  <!-- ====================== 헤더 ====================== -->
+  <header class="site-header">
+    <div class="brand">
+      <h1 class="logo" data-i18n="brand.name">PIXELFUN</h1>
+      <p class="tagline" data-i18n="brand.tagline">두뇌를 깨우는 미니게임 모음</p>
+    </div>
+
+    <div class="header-actions">
+      <!-- 언어 전환 (i18n.js가 처리) -->
+      <button
+        id="langToggleBtn"
+        class="icon-btn"
+        type="button"
+        aria-label="언어 전환"
+        title="한국어 / English"
+      >
+        🇰🇷
+      </button>
+
+      <!-- 사운드 ON/OFF (sound.js가 처리) -->
+      <button
+        id="soundToggleBtn"
+        class="icon-btn"
+        type="button"
+        aria-label="사운드 토글"
+        title="사운드 ON/OFF"
+      >
+        🔊
+      </button>
+
+      <!-- 로그인 (auth.js가 처리) -->
+      <button
+        id="loginBtn"
+        class="btn-primary"
+        type="button"
+        data-i18n="auth.login"
+      >
+        로그인
+      </button>
+    </div>
+  </header>
+
+  <!-- ====================== 메인 ====================== -->
+  <main class="container">
+    <!-- 게임 카드 그리드 -->
+    <section aria-labelledby="games-title">
+      <h2 id="games-title" class="section-title" data-i18n="section.games">
+        미니게임
+      </h2>
+
+      <div class="game-grid">
+        <!-- 1) 숫자 맞추기 -->
+        <a class="game-card" href="games/number.html" data-game="number">
+          <div class="game-icon" aria-hidden="true">🔢</div>
+          <div class="game-name" data-i18n="games.number.name">숫자 맞추기</div>
+          <p class="game-desc" data-i18n="games.number.desc">
+            힌트를 보고 정답 숫자를 추리하세요.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_number_best">-</span>
+          </div>
+        </a>
+
+        <!-- 2) 카드 뒤집기 -->
+        <a class="game-card" href="games/memory.html" data-game="memory">
+          <div class="game-icon" aria-hidden="true">🃏</div>
+          <div class="game-name" data-i18n="games.memory.name">카드 뒤집기</div>
+          <p class="game-desc" data-i18n="games.memory.desc">
+            짝을 빠르게 찾아내는 기억력 게임.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_memory_best" data-best-suffix="초">-</span>
+          </div>
+        </a>
+
+        <!-- 3) 타이핑 게임 -->
+        <a class="game-card" href="games/typing.html" data-game="typing">
+          <div class="game-icon" aria-hidden="true">⌨️</div>
+          <div class="game-name" data-i18n="games.typing.name">타이핑 게임</div>
+          <p class="game-desc" data-i18n="games.typing.desc">
+            정확하고 빠르게 단어를 입력하세요.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_typing_best" data-best-suffix="WPM">-</span>
+          </div>
+        </a>
+
+        <!-- 5) 암산 챌린지 -->
+        <a class="game-card" href="games/math.html" data-game="math">
+          <div class="game-icon" aria-hidden="true">🧮</div>
+          <div class="game-name" data-i18n="games.math.name">암산 챌린지</div>
+          <p class="game-desc" data-i18n="games.math.desc">
+            60초 안에 최대한 많이 풀어보세요.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_math_best" data-best-suffix="점">-</span>
+          </div>
+        </a>
+
+        <!-- 6) OX 퀴즈 -->
+        <a class="game-card" href="games/quiz.html" data-game="quiz">
+          <div class="game-icon" aria-hidden="true">❓</div>
+          <div class="game-name" data-i18n="games.quiz.name">OX 퀴즈</div>
+          <p class="game-desc" data-i18n="games.quiz.desc">
+            상식과 직감으로 O/X를 골라보세요.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_quiz_best" data-best-suffix="점">-</span>
+          </div>
+        </a>
+
+        <!-- 7) 색깔 맞추기 -->
+        <a class="game-card" href="games/color.html" data-game="color">
+          <div class="game-icon" aria-hidden="true">🎨</div>
+          <div class="game-name" data-i18n="games.color.name">색깔 맞추기</div>
+          <p class="game-desc" data-i18n="games.color.desc">
+            다른 색의 타일을 빠르게 찾으세요.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_color_best" data-best-suffix="점">-</span>
+          </div>
+        </a>
+
+        <!-- 8) 틱택토 -->
+        <a class="game-card" href="games/tictactoe.html" data-game="tictactoe">
+          <div class="game-icon" aria-hidden="true">⭕</div>
+          <div class="game-name" data-i18n="games.tictactoe.name">틱택토</div>
+          <p class="game-desc" data-i18n="games.tictactoe.desc">
+            AI와 3목 대결, 연승을 노려보세요.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_tictactoe_best" data-best-suffix="연승">-</span>
+          </div>
+        </a>
+
+        <!-- 9) 체스 -->
+        <a class="game-card" href="games/chess.html" data-game="chess">
+          <div class="game-icon" aria-hidden="true">♟️</div>
+          <div class="game-name" data-i18n="games.chess.name">체스</div>
+          <p class="game-desc" data-i18n="games.chess.desc">
+            AI와 한 판, 외통수로 승리하세요.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_chess_best" data-best-suffix="점">-</span>
+          </div>
+        </a>
+
+        <!-- 🔒 히든 게임: 모든 비보스 배지 획득 시 해금되는 시퀀스 마스터 -->
+        <a class="game-card secret-card locked" href="games/sequence.html" data-game="sequence" id="secretGameCard" aria-disabled="true">
+          <!-- 잠금 오버레이 (해금되면 사라짐) -->
+          <div class="lock-overlay" id="lockOverlay">
+            <span class="lock-emoji" aria-hidden="true">🔒</span>
+            <span class="lock-text">모든 비보스 배지를 모으면<br>시퀀스 마스터가 해금됩니다!</span>
+            <span class="lock-progress" id="secretProgress">0 / 0</span>
+          </div>
+          <div class="game-icon" aria-hidden="true">👾</div>
+          <div class="game-name">??? 시퀀스 마스터</div>
+          <p class="game-desc">
+            히든 보스. 보스 배지를 얻기 위한 첫 도전.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_sequence_best" data-best-suffix="레벨">-</span>
+          </div>
+        </a>
+
+        <!-- 🔒 최종 숨김 게임: 바로 플레이 가능하도록 해금 -->
+        <a class="game-card secret-card unlocked" href="games/random.html" data-game="random" id="finalSecretGameCard" aria-disabled="false">
+          <div class="lock-overlay" id="finalLockOverlay">
+            <span class="lock-emoji" aria-hidden="true">🔒</span>
+            <span class="lock-text">모든 배지를 모으면<br>최종 랜덤 패턴 보스가 해금됩니다!</span>
+            <span class="lock-progress" id="finalProgress">0 / 0</span>
+          </div>
+          <div class="game-icon" aria-hidden="true">🎲</div>
+          <div class="game-name">??? 랜덤 패턴 마스터</div>
+          <p class="game-desc">
+            모든 게임 패턴이 무작위로 바뀌는 최종 챌린지.
+          </p>
+          <div class="game-best">
+            <span data-i18n="ui.best">최고기록</span>:
+            <span class="best-value" data-best-key="pixelfun_random_best" data-best-suffix="레벨">-</span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <!-- 추가 섹션: 랭킹 / 마이페이지 / 배지 -->
+    <section aria-labelledby="features-title">
+      <h2 id="features-title" class="section-title" data-i18n="section.features">
+        나의 활동
+      </h2>
+
+      <div class="feature-row">
+        <a class="feature-card" href="#rankingSection" id="rankingLink">
+          <div class="feature-icon" aria-hidden="true">🏆</div>
+          <div class="feature-title" data-i18n="features.ranking.title">랭킹</div>
+          <p class="feature-desc" data-i18n="features.ranking.desc">
+            전 세계 플레이어와 점수를 겨뤄보세요.
+          </p>
+        </a>
+
+        <a class="feature-card" href="#myStatsSection" id="mypageLink">
+          <div class="feature-icon" aria-hidden="true">📊</div>
+          <div class="feature-title" data-i18n="features.mypage.title">마이페이지</div>
+          <p class="feature-desc" data-i18n="features.mypage.desc">
+            플레이 기록과 통계를 확인하세요.
+          </p>
+        </a>
+
+        <a class="feature-card" href="#badgeSection" id="badgesLink">
+          <div class="feature-icon" aria-hidden="true">🎖️</div>
+          <div class="feature-title" data-i18n="features.badges.title">배지</div>
+          <p class="feature-desc" data-i18n="features.badges.desc">
+            업적을 달성하고 배지를 모아보세요.
+          </p>
+        </a>
+      </div>
+    </section>
+
+    <!-- 랭킹 섹션 (ranking.js가 자동 렌더) -->
+    <section id="rankingSection" class="auto-section" aria-labelledby="ranking-title">
+      <h2 id="ranking-title" class="section-title" data-i18n="ranking.title">🏆 리더보드</h2>
+    </section>
+
+    <!-- 마이페이지(통계) 섹션 (stats.js가 자동 렌더) -->
+    <section id="myStatsSection" class="auto-section" aria-labelledby="stats-title">
+      <h2 id="stats-title" class="section-title" data-i18n="stats.title">📊 내 통계</h2>
+    </section>
+
+    <!-- 배지 섹션 (badge.js가 자동 렌더) -->
+    <section id="badgeSection" class="auto-section" aria-labelledby="badge-title">
+      <h2 id="badge-title" class="section-title" data-i18n="badge.title">🎖️ 배지</h2>
+    </section>
+  </main>
+
+  <!-- ====================== 푸터 ====================== -->
+  <footer class="site-footer">
+    <span class="footer-logo" aria-hidden="true">PIXELFUN</span>
+    <span data-i18n="footer.copy">&copy; 2026 PixelFun. All pixels reserved.</span>
+  </footer>
+
+  <!-- ====================== 인라인 스크립트: 최고기록 표시 ====================== -->
+  <script>
+    (function () {
+      // 각 게임 카드의 최고기록을 localStorage에서 읽어 표시
+      try {
+        var nodes = document.querySelectorAll('.best-value[data-best-key]');
+        nodes.forEach(function (el) {
+          var key = el.getAttribute('data-best-key');
+          var suffix = el.getAttribute('data-best-suffix') || '';
+          var raw = localStorage.getItem(key);
+          if (raw === null || raw === '' || raw === 'null' || raw === 'undefined') {
+            el.textContent = '-';
+            return;
+          }
+          var num = Number(raw);
+          if (!isNaN(num)) {
+            el.textContent = num.toLocaleString() + (suffix ? ' ' + suffix : '');
+          } else {
+            el.textContent = raw + (suffix ? ' ' + suffix : '');
+          }
+        });
+      } catch (e) {
+        // localStorage 접근 실패 시 조용히 무시 (게스트 모드 폴백)
+        console.warn('[PixelFun] 최고기록 로드 실패:', e);
+      }
+    })();
+  </script>
+
+  <!-- ====================== 히든 게임 해금 로직 ====================== -->
+  <script>
+    (function () {
+      var card = document.getElementById('secretGameCard');
+      var progressEl = document.getElementById('secretProgress');
+      var nameEl = card ? card.querySelector('.game-name') : null;
+      var descEl = card ? card.querySelector('.game-desc') : null;
+
+      var finalCard = document.getElementById('finalSecretGameCard');
+      var finalProgressEl = document.getElementById('finalProgress');
+      var finalNameEl = finalCard ? finalCard.querySelector('.game-name') : null;
+      var finalDescEl = finalCard ? finalCard.querySelector('.game-desc') : null;
+      if (!card && !finalCard) return;
+
+      // 잠금 상태에서 클릭/이동 차단 (키보드 접근 포함)
+      function blockLockedClick(element) {
+        if (!element) return;
+        element.addEventListener('click', function (e) {
+          if (element.classList.contains('locked')) {
+            e.preventDefault();
+          }
+        });
+      }
+      blockLockedClick(card);
+      blockLockedClick(finalCard);
+
+      function getBadgeCounts(includeBoss) {
+        var ownedIds = [], all = [];
+        try {
+          if (window.PixelBadge && typeof PixelBadge.getOwned === 'function') {
+            ownedIds = PixelBadge.getOwned() || [];
+          } else {
+            var raw = localStorage.getItem('pixelfun_badges');
+            ownedIds = raw ? (JSON.parse(raw) || []) : [];
+          }
+        } catch (e) { ownedIds = []; }
+        try {
+          if (window.PixelBadge && typeof PixelBadge.getAll === 'function') {
+            all = PixelBadge.getAll() || [];
+          }
+        } catch (e) { all = []; }
+
+        var required = all.filter(function (b) {
+          return includeBoss ? true : !b.boss;
+        });
+        var ownedSet = {};
+        ownedIds.forEach(function (id) { ownedSet[id] = true; });
+        var have = 0;
+        required.forEach(function (b) { if (ownedSet[b.id]) have++; });
+        return { owned: have, total: required.length, loaded: all.length > 0 };
+      }
+
+      function updateSecretCard(card, progressEl, nameEl, descEl, unlocked, unlockedTitle, unlockedDesc, lockedTitle, lockedDesc, progressText) {
+        if (progressEl) progressEl.textContent = progressText;
+        if (!card) return;
+        if (unlocked) {
+          card.classList.remove('locked');
+          card.classList.add('unlocked');
+          card.setAttribute('aria-disabled', 'false');
+          if (nameEl) nameEl.textContent = unlockedTitle;
+          if (descEl) descEl.textContent = unlockedDesc;
+        } else {
+          card.classList.add('locked');
+          card.classList.remove('unlocked');
+          card.setAttribute('aria-disabled', 'true');
+          if (nameEl) nameEl.textContent = lockedTitle;
+          if (descEl) descEl.textContent = lockedDesc;
+        }
+      }
+
+      function refresh() {
+        var seq = getBadgeCounts(false);
+        var finalBoss = getBadgeCounts(true);
+
+        if (!seq.loaded || !finalBoss.loaded) {
+          setTimeout(refresh, 300);
+          return;
+        }
+
+        if (progressEl) progressEl.textContent = seq.owned + ' / ' + seq.total;
+        if (finalProgressEl) finalProgressEl.textContent = finalBoss.owned + ' / ' + finalBoss.total;
+
+        updateSecretCard(
+          card, progressEl, nameEl, descEl,
+          seq.total > 0 && seq.owned >= seq.total,
+          '👾 시퀀스 마스터',
+          '모든 비보스 배지를 모두 모아야 해금됩니다.',
+          '??? 시퀀스 마스터',
+          '보스 배지를 얻기 위한 첫 도전. 모든 비보스 배지를 모으면 해금됩니다.',
+          seq.owned + ' / ' + seq.total
+        );
+
+        updateSecretCard(
+          finalCard, finalProgressEl, finalNameEl, finalDescEl,
+          true,
+          '🎲 랜덤 패턴 마스터',
+          '최종 보스 도전이 바로 가능합니다.',
+          '🎲 랜덤 패턴 마스터',
+          '최종 보스 도전이 바로 가능합니다.',
+          finalBoss.owned + ' / ' + finalBoss.total
+        );
+      }
+
+      // 최초 검사 + 배지/통계 변경 시 갱신
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', refresh);
+      } else {
+        refresh();
+      }
+      window.addEventListener('gameComplete', function () { setTimeout(refresh, 120); });
+      window.addEventListener('statsUpdated', refresh);
+      window.addEventListener('focus', refresh);
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden) refresh();
+      });
+      // 다른 탭에서 배지 획득 시 동기화
+      window.addEventListener('storage', function (e) {
+        if (e.key === 'pixelfun_badges') refresh();
+      });
+    })();
+  </script>
+
+  <!-- ====================== 다른 에이전트 담당 스크립트 (defer) ====================== -->
+  <script src="js/i18n.js" defer></script>
+  <script src="js/auth.js" defer></script>
+  <script src="js/sound.js" defer></script>
+  <script src="js/badge.js" defer></script>
+  <script src="js/stats.js" defer></script>
+  <script src="js/ranking.js" defer></script>
+</body>
+</html>

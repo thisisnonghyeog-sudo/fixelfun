@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>타이핑 게임 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .typing-game {
+      max-width: 600px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 1.5rem;
+    }
+    .typing-game h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      text-shadow: 0 0 12px var(--neon-yellow);
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+    }
+    .intro-screen, .result-screen {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-yellow);
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+    }
+    .intro-screen p { color: var(--text-secondary); margin: 0.5rem 0; line-height: 1.6; }
+    .top-bar {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 1rem;
+      background: var(--bg-card);
+      border-radius: 8px;
+      padding: 0.8rem;
+      border: 1px solid var(--neon-yellow);
+    }
+    .top-bar div { color: var(--text-secondary); font-size: 0.85rem; }
+    .top-bar strong { display: block; color: var(--neon-yellow); font-size: 1.4rem; margin-top: 0.2rem; font-family: 'Press Start 2P', cursive; }
+    .top-bar .danger { color: var(--neon-red); }
+    .word-box {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-blue);
+      border-radius: 12px;
+      padding: 2rem 1rem;
+      margin: 1rem 0;
+      box-shadow: 0 0 18px rgba(0, 212, 255, 0.3);
+    }
+    .target-word {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--neon-blue);
+      margin-bottom: 0.5rem;
+      letter-spacing: 2px;
+    }
+    .target-word.correct-flash { color: var(--neon-green); animation: flash 0.4s; }
+    .target-word.wrong-flash { color: var(--neon-red); animation: shake 0.3s; }
+    @keyframes flash { 50% { transform: scale(1.1); } }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+    .typing-input {
+      width: 100%;
+      max-width: 360px;
+      padding: 0.9rem;
+      font-size: 1.4rem;
+      background: var(--bg-main);
+      border: 2px solid var(--neon-purple);
+      border-radius: 8px;
+      color: var(--text-primary);
+      text-align: center;
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+    .typing-input:focus { outline: none; box-shadow: 0 0 12px var(--neon-purple); }
+    .button-row { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 1rem; }
+    .new-record {
+      color: var(--neon-yellow);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1rem;
+      margin: 1rem 0;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 50% { opacity: 0.5; } }
+    .result-stat {
+      font-size: 1.1rem;
+      color: var(--text-secondary);
+      margin: 0.6rem 0;
+    }
+    .result-stat strong { color: var(--neon-yellow); font-size: 1.4rem; }
+    .grade-badge {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 2.5rem;
+      margin: 1rem 0;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">타이핑 게임</span>
+  </nav>
+
+  <main class="game-container">
+    <div class="typing-game">
+      <h1>TYPING SPEED</h1>
+
+      <!-- 시작 화면 -->
+      <div id="introScreen" class="intro-screen">
+        <p>60초 동안 한국어 단어를 정확히 타이핑하세요!</p>
+        <p>입력 후 스페이스바 또는 엔터로 다음 단어로 이동.</p>
+        <p>WPM(분당 단어 수)과 정확도가 측정됩니다.</p>
+        <p>최고기록: <strong id="bestRecord" style="color:var(--neon-yellow)">-</strong> WPM</p>
+        <button class="btn-primary" id="startBtn">게임 시작</button>
+      </div>
+
+      <!-- 플레이 화면 -->
+      <div id="playScreen" class="hidden">
+        <div class="top-bar">
+          <div>남은 시간<strong id="timeView">60</strong></div>
+          <div>완료 단어<strong id="wordCount">0</strong></div>
+          <div>타자수<strong id="cpmView">0</strong></div>
+          <div>정확도<strong id="accView">100%</strong></div>
+        </div>
+        <div class="word-box">
+          <div class="target-word" id="targetWord">준비</div>
+          <input type="text" id="typingInput" class="typing-input" placeholder="여기에 입력하세요" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+        </div>
+      </div>
+
+      <!-- 결과 화면 -->
+      <div id="resultScreen" class="result-screen hidden">
+        <div class="grade-badge" id="gradeBadge">A</div>
+        <div class="result-stat">WPM: <strong id="finalWpm">0</strong></div>
+        <div class="result-stat">타자수(CPM): <strong id="finalCpm">0</strong></div>
+        <div class="result-stat">정확도: <strong id="finalAcc">0%</strong></div>
+        <div class="result-stat">완료 단어: <strong id="finalWords">0</strong></div>
+        <div id="newRecordMsg" class="new-record hidden">🏆 신기록 달성!</div>
+        <p style="color:var(--text-secondary); margin-top:0.6rem">최고 WPM: <strong style="color:var(--neon-yellow)" id="finalBest">-</strong></p>
+        <div class="button-row">
+          <button class="btn-primary" id="retryBtn">다시하기</button>
+          <a href="../index.html" class="btn-secondary">홈으로</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function() {
+      const STORAGE_KEY = 'pixelfun_typing_best';
+      const WORDS = [
+        '게임','픽셀','키보드','모니터','컴퓨터','인터넷','코딩','알고리즘',
+        '데이터','함수','변수','배열','객체','문자열','정수','실수',
+        '조건문','반복문','클래스','메서드','프레임워크','라이브러리','웹사이트','브라우저',
+        '서버','클라이언트','데이터베이스','네트워크','자바스크립트','파이썬','타입스크립트','리액트',
+        '레트로','네온','아케이드','콘솔','캐릭터','스테이지','보스','레벨업',
+        '점수','기록','도전','클리어','챔피언','메달','트로피','업적'
+      ];
+
+      const introScreen = document.getElementById('introScreen');
+      const playScreen = document.getElementById('playScreen');
+      const resultScreen = document.getElementById('resultScreen');
+      const startBtn = document.getElementById('startBtn');
+      const retryBtn = document.getElementById('retryBtn');
+      const targetWord = document.getElementById('targetWord');
+      const typingInput = document.getElementById('typingInput');
+      const timeView = document.getElementById('timeView');
+      const wordCount = document.getElementById('wordCount');
+      const accView = document.getElementById('accView');
+      const cpmView = document.getElementById('cpmView');
+      const bestRecord = document.getElementById('bestRecord');
+      const finalWpm = document.getElementById('finalWpm');
+      const finalCpm = document.getElementById('finalCpm');
+      const finalAcc = document.getElementById('finalAcc');
+      const finalWords = document.getElementById('finalWords');
+      const finalBest = document.getElementById('finalBest');
+      const newRecordMsg = document.getElementById('newRecordMsg');
+      const gradeBadge = document.getElementById('gradeBadge');
+
+      let currentWord = '';
+      let timeLeft = 60;
+      let timerId = null;
+      let correctWords = 0;
+      let totalAttempts = 0;
+      let correctChars = 0;
+      let totalChars = 0;
+
+      function getBest() {
+        const v = localStorage.getItem(STORAGE_KEY);
+        return v ? parseInt(v, 10) : null;
+      }
+      function setBest(v) { localStorage.setItem(STORAGE_KEY, String(v)); }
+      function showBest() {
+        const b = getBest();
+        bestRecord.textContent = b ? b : '-';
+      }
+
+      function pickWord() {
+        let w;
+        do { w = WORDS[Math.floor(Math.random() * WORDS.length)]; }
+        while (w === currentWord);
+        currentWord = w;
+        targetWord.textContent = w;
+        targetWord.className = 'target-word';
+      }
+
+      function startGame() {
+        introScreen.classList.add('hidden');
+        resultScreen.classList.add('hidden');
+        playScreen.classList.remove('hidden');
+        timeLeft = 60;
+        correctWords = 0;
+        totalAttempts = 0;
+        correctChars = 0;
+        totalChars = 0;
+        timeView.textContent = '60';
+        wordCount.textContent = '0';
+        cpmView.textContent = '0';
+        accView.textContent = '100%';
+        typingInput.value = '';
+        typingInput.disabled = false;
+        pickWord();
+        typingInput.focus();
+        if (timerId) clearInterval(timerId);
+        timerId = setInterval(tick, 1000);
+        if (window.PixelSound) PixelSound.play('start');
+      }
+
+      function currentCpm() {
+        const elapsed = 60 - timeLeft;
+        if (elapsed <= 0) return 0;
+        return Math.round((correctChars / elapsed) * 60);
+      }
+
+      function tick() {
+        timeLeft--;
+        timeView.textContent = timeLeft;
+        if (timeLeft <= 5) timeView.classList.add('danger');
+        else timeView.classList.remove('danger');
+        cpmView.textContent = currentCpm();
+        if (timeLeft <= 0) endGame();
+      }
+
+      function checkSubmission() {
+        const val = typingInput.value.trim();
+        if (val === '') return;
+        totalAttempts++;
+        // char-level accuracy
+        const target = currentWord;
+        const len = Math.max(val.length, target.length);
+        for (let i = 0; i < len; i++) {
+          totalChars++;
+          if (val[i] === target[i]) correctChars++;
+        }
+        if (val === target) {
+          correctWords++;
+          wordCount.textContent = correctWords;
+          targetWord.classList.add('correct-flash');
+          if (window.PixelSound) PixelSound.play('success');
+        } else {
+          targetWord.classList.add('wrong-flash');
+          if (window.PixelSound) PixelSound.play('fail');
+        }
+        const acc = totalChars > 0 ? Math.round((correctChars / totalChars) * 100) : 100;
+        accView.textContent = acc + '%';
+        cpmView.textContent = currentCpm();
+        typingInput.value = '';
+        setTimeout(pickWord, 100);
+      }
+
+      function gradeOf(wpm) {
+        if (wpm >= 60) return 'S';
+        if (wpm >= 40) return 'A';
+        if (wpm >= 25) return 'B';
+        return 'C';
+      }
+
+      function endGame() {
+        clearInterval(timerId);
+        typingInput.disabled = true;
+        const wpm = correctWords; // 60초간 완료 단어 = 분당 단어 수
+        const cpm = correctChars; // 60초 플레이이므로 정타 수 = 분당 타자수
+        const acc = totalChars > 0 ? Math.round((correctChars / totalChars) * 100) : 0;
+        const best = getBest();
+        const isNewRecord = !best || wpm > best;
+        if (isNewRecord && wpm > 0) setBest(wpm);
+
+        playScreen.classList.add('hidden');
+        resultScreen.classList.remove('hidden');
+        finalWpm.textContent = wpm;
+        finalCpm.textContent = cpm;
+        finalAcc.textContent = acc + '%';
+        finalWords.textContent = correctWords;
+        const grade = gradeOf(wpm);
+        gradeBadge.textContent = grade;
+        gradeBadge.className = 'grade-badge grade-' + grade;
+        // fallback color in case CSS class missing
+        const colorMap = { S: 'var(--neon-yellow)', A: 'var(--neon-green)', B: 'var(--neon-blue)', C: 'var(--neon-purple)' };
+        gradeBadge.style.color = colorMap[grade];
+        gradeBadge.style.textShadow = '0 0 12px ' + colorMap[grade];
+
+        const finalBestVal = getBest();
+        finalBest.textContent = finalBestVal != null ? finalBestVal : '-';
+        newRecordMsg.classList.toggle('hidden', !(isNewRecord && wpm > 0));
+        if (window.PixelSound) PixelSound.play('clear');
+
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: { game: 'typing', score: wpm, isNewRecord: isNewRecord && wpm > 0 }
+        }));
+      }
+
+      typingInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          checkSubmission();
+        }
+      });
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+      showBest();
+    })();
+  </script>
+</body>
+</html>

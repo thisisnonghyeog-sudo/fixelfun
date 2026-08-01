@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OX 퀴즈 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .quiz-intro, .quiz-play, .quiz-result { display: none; }
+    .quiz-intro.active, .quiz-play.active, .quiz-result.active { display: block; }
+
+    .quiz-intro {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .quiz-intro h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      font-size: 1.8rem;
+      margin-bottom: 24px;
+      text-shadow: 0 0 12px rgba(123, 47, 247, 0.7);
+    }
+    .quiz-intro p {
+      color: var(--text-secondary);
+      line-height: 1.8;
+      margin-bottom: 12px;
+    }
+    .quiz-best {
+      color: var(--neon-yellow);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9rem;
+      margin: 20px 0;
+    }
+
+    .quiz-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    .hud-item {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-purple);
+      border-radius: 12px;
+      padding: 12px 18px;
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      box-shadow: 0 0 14px rgba(123, 47, 247, 0.25);
+    }
+    .hud-item .label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .hud-item .value {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.3rem;
+    }
+    .hud-item.timer .value { color: var(--neon-yellow); }
+    .hud-item.timer.warning .value { color: var(--neon-red); animation: pulse 0.6s infinite; }
+    .hud-item.combo .value { color: var(--neon-green); }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    .quiz-card {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-blue);
+      border-radius: 16px;
+      padding: 40px 20px;
+      text-align: center;
+      box-shadow: 0 0 24px rgba(0, 212, 255, 0.3);
+      margin-bottom: 24px;
+      min-height: 200px;
+    }
+    .quiz-card.flash-correct {
+      border-color: var(--neon-green);
+      box-shadow: 0 0 30px var(--neon-green);
+    }
+    .quiz-card.flash-wrong {
+      border-color: var(--neon-red);
+      box-shadow: 0 0 30px var(--neon-red);
+    }
+    .quiz-question {
+      color: var(--text-primary);
+      font-size: 1.4rem;
+      line-height: 1.7;
+      margin: 30px 10px;
+      font-weight: 700;
+    }
+
+    .ox-buttons {
+      display: flex;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+    .ox-btn {
+      width: 120px;
+      height: 120px;
+      border-radius: 50%;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 3rem;
+      border: 4px solid;
+      background: var(--bg-card);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .ox-btn.o {
+      color: var(--neon-green);
+      border-color: var(--neon-green);
+    }
+    .ox-btn.x {
+      color: var(--neon-red);
+      border-color: var(--neon-red);
+    }
+    .ox-btn:hover:not(:disabled) {
+      transform: translateY(-6px);
+      box-shadow: 0 0 22px currentColor;
+    }
+    .ox-btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+    .ox-btn .key-hint {
+      display: block;
+      font-size: 0.6rem;
+      color: var(--text-secondary);
+      margin-top: 6px;
+    }
+
+    .feedback {
+      min-height: 30px;
+      font-family: 'Press Start 2P', cursive;
+      margin-top: 18px;
+      font-size: 1rem;
+    }
+    .feedback.correct { color: var(--neon-green); }
+    .feedback.wrong { color: var(--neon-red); }
+
+    .combo-floater {
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 2rem;
+      text-shadow: 0 0 18px var(--neon-yellow);
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.6s ease;
+      z-index: 10;
+    }
+    .combo-floater.show { opacity: 1; top: 25%; }
+
+    .quiz-result {
+      text-align: center;
+      padding: 30px 20px;
+    }
+    .grade-badge {
+      display: inline-block;
+      width: 160px;
+      height: 160px;
+      line-height: 160px;
+      border-radius: 50%;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 4rem;
+      margin: 20px 0;
+      border: 4px solid currentColor;
+    }
+    .grade-S { color: var(--neon-yellow); box-shadow: 0 0 36px var(--neon-yellow); }
+    .grade-A { color: var(--neon-green); box-shadow: 0 0 30px var(--neon-green); }
+    .grade-B { color: var(--neon-blue); box-shadow: 0 0 24px var(--neon-blue); }
+    .grade-C { color: var(--neon-red); box-shadow: 0 0 20px var(--neon-red); }
+
+    .result-stats {
+      margin: 24px 0;
+      color: var(--text-secondary);
+    }
+    .result-stats .big {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.6rem;
+      display: block;
+      margin: 6px 0;
+    }
+    .new-record {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 1.1rem;
+      margin: 14px 0;
+      animation: pulse 1s infinite;
+    }
+    .result-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+
+    @media (max-width: 600px) {
+      .quiz-question { font-size: 1.1rem; }
+      .ox-btn { width: 90px; height: 90px; font-size: 2rem; }
+      .grade-badge { width: 120px; height: 120px; line-height: 120px; font-size: 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">OX 퀴즈</span>
+  </nav>
+
+  <main class="game-container">
+    <section class="quiz-intro active" id="introScreen">
+      <h1>OX 퀴즈</h1>
+      <p>60초 동안 상식 문제에 O 또는 X로 답하세요!</p>
+      <p>키보드 ← (O) / → (X) 단축키로도 답할 수 있습니다.</p>
+      <p>연속 정답 시 콤보 보너스 획득 (5콤보 이상부터).</p>
+      <div class="quiz-best" id="introBest">최고 기록: 0</div>
+      <button class="btn-primary" id="startBtn">게임 시작</button>
+    </section>
+
+    <section class="quiz-play" id="playScreen">
+      <div class="quiz-hud">
+        <div class="hud-item timer" id="timerBox">
+          <span class="label">남은 시간</span>
+          <span class="value" id="timerVal">60</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">점수</span>
+          <span class="value" id="scoreVal">0</span>
+        </div>
+        <div class="hud-item combo">
+          <span class="label">콤보</span>
+          <span class="value" id="comboVal">0</span>
+        </div>
+      </div>
+
+      <div class="quiz-card" id="quizCard">
+        <div class="quiz-question" id="questionText">문제 로딩 중...</div>
+        <div class="ox-buttons">
+          <button class="ox-btn o" id="btnO">O<span class="key-hint">←</span></button>
+          <button class="ox-btn x" id="btnX">X<span class="key-hint">→</span></button>
+        </div>
+        <div class="feedback" id="feedback"></div>
+      </div>
+    </section>
+
+    <section class="quiz-result" id="resultScreen">
+      <h2 style="font-family:'Press Start 2P', cursive; color: var(--neon-purple);">결과</h2>
+      <div class="grade-badge" id="gradeBadge">-</div>
+      <div class="result-stats">
+        <span>정답 수</span>
+        <span class="big" id="finalScore">0</span>
+        <span>정답률 <span id="accuracy">0%</span></span>
+      </div>
+      <div class="new-record" id="newRecord" style="display:none;">🎉 신기록!</div>
+      <div class="result-buttons">
+        <button class="btn-primary" id="retryBtn">다시하기</button>
+        <a href="../index.html" class="btn-secondary">홈으로</a>
+      </div>
+    </section>
+  </main>
+
+  <div class="combo-floater" id="comboFloater"></div>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function() {
+      const QUIZ_POOL = [
+        { q: '한국의 수도는 서울이다.', a: true },
+        { q: '지구는 평평하다.', a: false },
+        { q: '고래는 포유류이다.', a: true },
+        { q: '토마토는 채소이다.', a: false },
+        { q: '태양은 항성(별)이다.', a: true },
+        { q: '거미는 곤충이다.', a: false },
+        { q: '한글은 세종대왕이 창제하였다.', a: true },
+        { q: '에펠탑은 영국 런던에 있다.', a: false },
+        { q: '물의 화학식은 H2O이다.', a: true },
+        { q: '북극에는 펭귄이 산다.', a: false },
+        { q: '대한민국의 국화는 무궁화이다.', a: true },
+        { q: '박쥐는 새이다.', a: false },
+        { q: '빛은 소리보다 빠르다.', a: true },
+        { q: '백두산은 한반도에서 가장 낮은 산이다.', a: false },
+        { q: '인간의 정상 체온은 약 36.5도이다.', a: true },
+        { q: '달은 스스로 빛을 낸다.', a: false },
+        { q: '한국전쟁은 1950년에 발발했다.', a: true },
+        { q: '카멜레온은 색을 바꾸지 못한다.', a: false },
+        { q: '피라미드는 이집트에 있다.', a: true },
+        { q: '뱀은 다리가 4개다.', a: false },
+        { q: '대한민국의 화폐 단위는 원이다.', a: true },
+        { q: '소금의 주성분은 설탕이다.', a: false },
+        { q: '독도는 대한민국 영토이다.', a: true },
+        { q: '낙타는 등에 물을 저장한다.', a: false },
+        { q: '훈민정음은 1443년에 창제되었다.', a: true },
+        { q: '치타는 세상에서 가장 빠른 새이다.', a: false },
+        { q: '바나나는 나무가 아니라 풀이다.', a: true },
+        { q: '아인슈타인은 노벨 수학상을 받았다.', a: false },
+        { q: '대한민국의 광복절은 8월 15일이다.', a: true },
+        { q: '벌은 한 번 침을 쏘아도 죽지 않는다.', a: false },
+        { q: '심장은 왼쪽 가슴에 있다.', a: true },
+        { q: '고래상어는 포유류이다.', a: false },
+        { q: '일본의 수도는 도쿄이다.', a: true },
+        { q: '코끼리는 점프할 수 있다.', a: false },
+        { q: '한라산은 제주도에 있다.', a: true }
+      ];
+
+      const introScreen = document.getElementById('introScreen');
+      const playScreen = document.getElementById('playScreen');
+      const resultScreen = document.getElementById('resultScreen');
+      const startBtn = document.getElementById('startBtn');
+      const retryBtn = document.getElementById('retryBtn');
+      const timerVal = document.getElementById('timerVal');
+      const timerBox = document.getElementById('timerBox');
+      const scoreVal = document.getElementById('scoreVal');
+      const comboVal = document.getElementById('comboVal');
+      const questionText = document.getElementById('questionText');
+      const btnO = document.getElementById('btnO');
+      const btnX = document.getElementById('btnX');
+      const feedback = document.getElementById('feedback');
+      const quizCard = document.getElementById('quizCard');
+      const introBest = document.getElementById('introBest');
+      const gradeBadge = document.getElementById('gradeBadge');
+      const finalScore = document.getElementById('finalScore');
+      const accuracy = document.getElementById('accuracy');
+      const newRecord = document.getElementById('newRecord');
+      const comboFloater = document.getElementById('comboFloater');
+
+      let timeLeft = 60;
+      let score = 0;
+      let combo = 0;
+      let totalAttempts = 0;
+      let currentAnswer = null;
+      let timerId = null;
+      let pool = [];
+      let locked = false;
+
+      function showScreen(target) {
+        [introScreen, playScreen, resultScreen].forEach(s => s.classList.remove('active'));
+        target.classList.add('active');
+      }
+
+      function loadBest() {
+        const best = parseInt(localStorage.getItem('pixelfun_quiz_best') || '0', 10);
+        introBest.textContent = `최고 기록: ${best}`;
+      }
+
+      function shuffle(arr) {
+        const a = arr.slice();
+        for (let i = a.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [a[i], a[j]] = [a[j], a[i]];
+        }
+        return a;
+      }
+
+      function nextQuestion() {
+        if (pool.length === 0) pool = shuffle(QUIZ_POOL);
+        const item = pool.pop();
+        currentAnswer = item.a;
+        questionText.textContent = item.q;
+        feedback.textContent = '';
+        feedback.className = 'feedback';
+        quizCard.classList.remove('flash-correct', 'flash-wrong');
+        locked = false;
+      }
+
+      function showCombo(n) {
+        comboFloater.textContent = n + 'x COMBO!';
+        comboFloater.classList.add('show');
+        setTimeout(() => comboFloater.classList.remove('show'), 600);
+      }
+
+      function answer(userVal) {
+        if (locked || timeLeft <= 0) return;
+        locked = true;
+        totalAttempts++;
+        if (userVal === currentAnswer) {
+          combo++;
+          let gained = 1;
+          if (combo >= 5) gained += Math.floor(combo / 5);
+          score += gained;
+          if (window.PixelSound) PixelSound.play('success');
+          quizCard.classList.add('flash-correct');
+          feedback.textContent = '정답! +' + gained;
+          feedback.className = 'feedback correct';
+          if (combo >= 2) showCombo(combo);
+        } else {
+          combo = 0;
+          if (window.PixelSound) PixelSound.play('fail');
+          quizCard.classList.add('flash-wrong');
+          feedback.textContent = '오답!';
+          feedback.className = 'feedback wrong';
+        }
+        scoreVal.textContent = score;
+        comboVal.textContent = combo;
+        setTimeout(nextQuestion, 500);
+      }
+
+      function tick() {
+        timeLeft--;
+        timerVal.textContent = timeLeft;
+        if (timeLeft <= 5) timerBox.classList.add('warning');
+        if (timeLeft <= 0) endGame();
+      }
+
+      function getGrade(s) {
+        if (s >= 25) return 'S';
+        if (s >= 18) return 'A';
+        if (s >= 10) return 'B';
+        return 'C';
+      }
+
+      function startGame() {
+        timeLeft = 60;
+        score = 0;
+        combo = 0;
+        totalAttempts = 0;
+        pool = shuffle(QUIZ_POOL);
+        timerVal.textContent = '60';
+        scoreVal.textContent = '0';
+        comboVal.textContent = '0';
+        timerBox.classList.remove('warning');
+        if (window.PixelSound) PixelSound.play('start');
+        showScreen(playScreen);
+        nextQuestion();
+        timerId = setInterval(tick, 1000);
+      }
+
+      function endGame() {
+        clearInterval(timerId);
+        locked = true;
+        if (window.PixelSound) PixelSound.play('clear');
+        const best = parseInt(localStorage.getItem('pixelfun_quiz_best') || '0', 10);
+        const isNewRecord = score > best;
+        if (isNewRecord) localStorage.setItem('pixelfun_quiz_best', score);
+
+        const grade = getGrade(score);
+        gradeBadge.textContent = grade;
+        gradeBadge.className = 'grade-badge grade-' + grade;
+        finalScore.textContent = score;
+        const acc = totalAttempts === 0 ? 0 : Math.round((score / totalAttempts) * 100);
+        accuracy.textContent = acc + '%';
+        newRecord.style.display = isNewRecord ? 'block' : 'none';
+
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: { game: 'quiz', score: score, grade: grade, isNewRecord: isNewRecord }
+        }));
+        showScreen(resultScreen);
+      }
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+      btnO.addEventListener('click', () => answer(true));
+      btnX.addEventListener('click', () => answer(false));
+      document.addEventListener('keydown', (e) => {
+        if (!playScreen.classList.contains('active')) return;
+        if (e.key === 'ArrowLeft') answer(true);
+        else if (e.key === 'ArrowRight') answer(false);
+      });
+
+      loadBest();
+    })();
+  </script>
+</body>
+</html>

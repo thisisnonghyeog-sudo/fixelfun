@@ -1,0 +1,106 @@
+{
+  "brand": {
+    "name": "PIXELFUN",
+    "slogan": "두뇌를 깨우는 미니게임 모음",
+    "tagline": "두뇌를 깨우는 미니게임 모음"
+  },
+  "section": {
+    "games": "미니게임",
+    "features": "나의 활동"
+  },
+  "ui": {
+    "best": "최고기록"
+  },
+  "features": {
+    "ranking": {
+      "title": "랭킹",
+      "desc": "전 세계 플레이어와 점수를 겨뤄보세요."
+    },
+    "mypage": {
+      "title": "마이페이지",
+      "desc": "플레이 기록과 통계를 확인하세요."
+    },
+    "badges": {
+      "title": "배지",
+      "desc": "업적을 달성하고 배지를 모아보세요."
+    }
+  },
+  "nav": {
+    "home": "홈으로",
+    "ranking": "랭킹",
+    "mypage": "마이페이지",
+    "badges": "배지"
+  },
+  "auth": {
+    "login": "로그인",
+    "logout": "로그아웃",
+    "signup": "회원가입",
+    "email": "이메일",
+    "password": "비밀번호",
+    "googleLogin": "구글로 로그인",
+    "guestStart": "게스트로 시작",
+    "nickname": "닉네임",
+    "welcome": "환영합니다, {name}님!",
+    "loginFailed": "로그인 실패",
+    "guestModeOnly": "게스트 모드만 사용 가능합니다",
+    "emailPlaceholder": "이메일을 입력하세요",
+    "passwordPlaceholder": "비밀번호를 입력하세요",
+    "nicknamePlaceholder": "닉네임을 입력하세요",
+    "or": "또는",
+    "close": "닫기",
+    "signupSuccess": "회원가입 성공! 자동 로그인됩니다",
+    "logoutSuccess": "로그아웃되었습니다",
+    "guestWelcome": "게스트 모드로 시작합니다"
+  },
+  "game": {
+    "start": "게임 시작",
+    "retry": "다시하기",
+    "result": "결과",
+    "score": "점수",
+    "best": "최고기록",
+    "newRecord": "신기록!",
+    "time": "시간",
+    "combo": "콤보",
+    "grade": "등급",
+    "playing": "플레이 중...",
+    "gameOver": "게임 종료"
+  },
+  "games": {
+    "number": { "name": "숫자 맞추기", "desc": "1~100 사이 숫자를 맞춰보세요" },
+    "memory": { "name": "카드 뒤집기", "desc": "같은 카드 짝을 찾으세요" },
+    "typing": { "name": "타이핑 게임", "desc": "60초 동안 빠르게 타이핑" },
+    "math": { "name": "암산 챌린지", "desc": "60초 동안 암산 풀기" },
+    "quiz": { "name": "OX 퀴즈", "desc": "상식 OX 퀴즈" },
+    "color": { "name": "색깔 맞추기", "desc": "스트룹 효과 도전" },
+    "chess": { "name": "체스", "desc": "AI와 한 판, 외통수로 승리하세요" },
+    "tictactoe": { "name": "틱택토", "desc": "AI와 3목 대결, 연승을 노려보세요" }
+  },
+  "stats": {
+    "title": "내 통계",
+    "totalPlays": "총 플레이",
+    "firstPlay": "첫 플레이",
+    "lastPlay": "최근 플레이",
+    "reset": "초기화"
+  },
+  "ranking": {
+    "title": "리더보드",
+    "rank": "순위",
+    "player": "플레이어",
+    "score": "점수",
+    "noData": "기록이 없습니다",
+    "selectGame": "게임 선택"
+  },
+  "badge": {
+    "title": "배지",
+    "owned": "획득",
+    "locked": "미획득",
+    "newBadge": "🎉 새 배지 획득: {name}"
+  },
+  "sound": {
+    "on": "사운드 켜짐",
+    "off": "사운드 꺼짐"
+  },
+  "footer": {
+    "copy": "© 2026 PixelFun. All rights reserved."
+  }
+}

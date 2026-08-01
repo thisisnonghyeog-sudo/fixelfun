@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>랜덤 패턴 마스터 - PixelFun</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="../style.css" />
+  <style>
+    body { background: radial-gradient(circle at top left, rgba(255,215,0,0.08), transparent 25%), radial-gradient(circle at bottom right, rgba(0,212,255,0.08), transparent 24%), var(--bg-main); }
+    .game-container { padding: 24px 20px 40px; max-width: 960px; margin: 0 auto; }
+    .random-intro, .random-play, .random-result { display: none; }
+    .random-intro.active, .random-play.active, .random-result.active { display: block; }
+    .random-intro h1, .random-result h2 { font-family: var(--font-pixel); color: var(--neon-purple); margin-bottom: 16px; }
+    .boss-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 auto 18px;
+      padding: 10px 16px;
+      border: 2px solid var(--neon-red);
+      border-radius: 999px;
+      background: rgba(255, 71, 87, 0.12);
+      color: var(--neon-red);
+      font-family: var(--font-pixel);
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      box-shadow: 0 0 18px rgba(255, 71, 87, 0.2);
+    }
+    .boss-badge .boss-icon { font-size: 1rem; }
+    .random-rules { max-width: 680px; margin: 0 auto 20px; padding: 18px 20px; background: var(--bg-card); border: 2px solid var(--neon-blue); border-radius: var(--radius-card); }
+    .random-rules li { color: var(--text-secondary); margin-bottom: 10px; line-height: 1.8; }
+    .random-hint { margin: 18px auto; padding: 14px 16px; max-width: 680px; background: var(--bg-card); border: 2px solid var(--neon-blue); border-radius: var(--radius-card); color: var(--neon-yellow); font-family: var(--font-pixel); line-height: 1.6; }
+    .random-best { color: var(--neon-green); font-family: var(--font-pixel); margin-bottom: 24px; }
+    .random-hud { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+    .random-hud .hud-item { min-width: 110px; padding: 12px 14px; border-radius: 14px; background: var(--bg-card); border: 2px solid var(--neon-purple); text-align: center; }
+    .random-hud .label { display: block; color: var(--text-secondary); margin-bottom: 6px; font-size: 0.75rem; }
+    .random-hud .value { font-family: var(--font-pixel); font-size: 1.3rem; color: var(--neon-blue); }
+    .boss-panel { max-width: 720px; margin: 0 auto 18px; padding: 16px 18px; border: 2px solid var(--neon-red); border-radius: 16px; background: rgba(255,71,87,0.09); box-shadow: 0 0 16px rgba(255,71,87,0.16); }
+    .boss-top { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+    .boss-title { font-family: var(--font-pixel); color: var(--neon-red); font-size: 0.82rem; letter-spacing: 1px; }
+    .boss-phase { color: var(--neon-yellow); font-size: 0.9rem; font-weight: 700; }
+    .boss-face { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .boss-portrait { width: 72px; height: 72px; display: grid; place-items: center; border-radius: 18px; background: linear-gradient(135deg, rgba(255,71,87,0.25), rgba(255,140,26,0.2)); border: 2px solid rgba(255,255,255,0.12); font-size: 2rem; box-shadow: inset 0 0 16px rgba(255,255,255,0.08); }
+    .boss-talk { flex: 1; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: var(--text-secondary); font-size: 0.95rem; line-height: 1.5; }
+    .boss-talk strong { color: var(--neon-yellow); }
+    .boss-bar { height: 12px; width: 100%; background: rgba(255,255,255,0.08); border-radius: 999px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); }
+    .boss-bar > span { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, var(--neon-red), #ff8c1a); transition: width 0.25s ease; }
+    .boss-hp { margin-top: 8px; color: var(--text-secondary); font-size: 0.9rem; }
+    .random-result .boss-panel,
+    .random-result .boss-badge,
+    .random-result .hidden-boss-ui { display: none; }
+    .memory-hud { display: flex; justify-content: center; gap: 10px; margin: 12px 0 16px; flex-wrap: wrap; }
+    .memory-hud .chance-pill { padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.05); color: var(--text-secondary); font-size: 0.9rem; }
+    .memory-board {
+      max-width: 420px;
+      margin: 0 auto;
+      padding: 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, #0f5a2b, #145c34 40%, #0b3d22);
+      border: 3px solid rgba(255,255,255,0.15);
+      box-shadow: inset 0 0 24px rgba(0,0,0,0.35), 0 0 20px rgba(0,255,136,0.12);
+    }
+    .memory-hud .chance-pill.active { color: var(--neon-yellow); border-color: var(--neon-yellow); }
+    .random-status { text-align: center; font-family: var(--font-pixel); margin-bottom: 16px; font-size: 1rem; color: var(--neon-yellow); min-height: 28px; }
+    .random-status.ready { color: var(--neon-blue); }
+    .random-status.fail { color: var(--neon-red); }
+    .timer-track { height: 10px; width: 100%; max-width: 620px; background: #11112a; border-radius: 8px; overflow: hidden; margin: 0 auto 18px; border: 1px solid rgba(255,255,255,0.1); opacity: 0; transition: opacity 0.2s ease; }
+    .timer-track.show { opacity: 1; }
+    .timer-fill { width: 100%; height: 100%; background: linear-gradient(90deg, var(--neon-green), var(--neon-yellow)); transition: width 0.05s linear; }
+    .timer-fill.danger { background: linear-gradient(90deg, var(--neon-red), #ff8c00); }
+    .challenge-card { max-width: 720px; margin: 0 auto; padding: 24px; background: rgba(26,26,46,0.95); border: 2px solid rgba(255,255,255,0.12); border-radius: 18px; box-shadow: var(--shadow-neon); }
+    .challenge-title { font-family: var(--font-pixel); font-size: 0.7rem; color: var(--neon-yellow); margin-bottom: 12px; letter-spacing: 1px; }
+    .challenge-prompt { font-size: 1.1rem; font-weight: 700; margin-bottom: 18px; color: var(--text-primary); line-height: 1.7; }
+    .answer-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .answer-btn, .submit-btn, .typing-input { width: 100%; padding: 12px 14px; border-radius: 12px; border: 2px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.04); color: var(--text-primary); font-family: var(--font-body); font-size: 1rem; }
+    .answer-btn:hover, .submit-btn:hover { transform: translateY(-2px); border-color: var(--neon-blue); }
+    .answer-btn.color-choice { min-height: 84px; padding: 0; border-width: 3px; box-shadow: inset 0 0 0 1px rgba(255,255,255,0.15); }
+    .answer-btn.correct { border-color: var(--neon-green); box-shadow: 0 0 16px rgba(0,255,136,0.2); }
+    .typing-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .typing-input { flex: 1; min-width: 220px; }
+    .submit-btn { max-width: 160px; background: linear-gradient(135deg, var(--neon-purple), var(--neon-blue)); font-family: var(--font-pixel); font-size: 0.8rem; }
+    .color-swatch { display: inline-block; width: 18px; height: 18px; border-radius: 4px; margin-right: 8px; vertical-align: middle; }
+    .memory-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+    .memory-card {
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.22);
+      background: linear-gradient(135deg, #2b1a4a, #120d22);
+      color: #f8f3ff;
+      font-size: 1.1rem;
+      font-weight: 700;
+      box-shadow: inset 0 0 12px rgba(255,255,255,0.08), 0 6px 12px rgba(0,0,0,0.25);
+    }
+    .sequence-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; max-width: 320px; margin: 0 auto 14px; }
+    .sequence-pad {
+      aspect-ratio: 1 / 1;
+      border-radius: 12px;
+      border: 2px solid rgba(255,255,255,0.16);
+      background: rgba(255,255,255,0.05);
+      box-shadow: inset 0 0 10px rgba(255,255,255,0.04);
+      transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+    }
+    .sequence-pad.lit {
+      transform: scale(1.05);
+      filter: brightness(1.25);
+      box-shadow: 0 0 16px rgba(123,47,247,0.24);
+    }
+    .sequence-pad.c0 { background: linear-gradient(135deg, var(--neon-purple), #8a2bff); }
+    .sequence-pad.c1 { background: linear-gradient(135deg, var(--neon-blue), #0ea5ff); }
+    .sequence-pad.c2 { background: linear-gradient(135deg, var(--neon-yellow), #ffb703); }
+    .sequence-pad.c3 { background: linear-gradient(135deg, var(--neon-green), #16c47f); }
+    .sequence-pad.c4 { background: linear-gradient(135deg, var(--neon-red), #ff6b6b); }
+    .sequence-pad.c5 { background: linear-gradient(135deg, #ff8c1a, #ffb347); }
+    .sequence-pad.c6 { background: linear-gradient(135deg, #ff3fa4, #ff72c2); }
+    .sequence-pad.c7 { background: linear-gradient(135deg, #1ee0c0, #64f5ea); }
+    .sequence-pad.c8 { background: linear-gradient(135deg, #b388ff, #d4b7ff); }
+    .memory-card.revealed, .memory-card.matched {
+      background: linear-gradient(135deg, #fff8d6, #f2c94c);
+      color: #4a2d00;
+      border-color: #ffdf6b;
+      box-shadow: 0 0 14px rgba(255,215,0,0.22);
+    }
+    .memory-card.matched { border-color: var(--neon-green); }
+    .mini-chess-board {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 2px;
+      max-width: 320px;
+      margin: 0 auto 14px;
+      aspect-ratio: 1 / 1;
+    }
+    .mini-square {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background 0.15s ease, transform 0.15s ease;
+    }
+    .mini-square.light { background: #2c2c50; }
+    .mini-square.dark { background: #191925; }
+    .mini-square:hover { transform: translateY(-1px); }
+    .mini-square.selected { box-shadow: inset 0 0 0 3px var(--neon-yellow); }
+    .mini-square.in-check { background: rgba(255, 71, 87, 0.45) !important; }
+    .mini-square .dot {
+      position: absolute;
+      width: 24%;
+      height: 24%;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.9);
+      box-shadow: 0 0 8px rgba(255,255,255,0.3);
+      pointer-events: none;
+    }
+    .mini-piece { font-size: 1.4rem; }
+    .mini-piece.w { color: #ffffff; text-shadow: 0 0 6px rgba(0, 212, 255, 0.7), 0 1px 0 #000; }
+    .mini-piece.b { color: #1a1a2e; text-shadow: 0 0 6px rgba(123, 47, 247, 0.8), 0 1px 0 #fff; }
+
+    .mini-ttt-board {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      max-width: 280px;
+      margin: 0 auto 14px;
+    }
+    .mini-ttt-cell {
+      aspect-ratio: 1 / 1;
+      border: 2px solid rgba(255,255,255,0.16);
+      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      color: var(--text-primary);
+      font-family: var(--font-pixel);
+      font-size: 1.2rem;
+      box-shadow: inset 0 0 10px rgba(255,255,255,0.04);
+    }
+    .mini-ttt-cell.x { color: var(--neon-blue); }
+    .mini-ttt-cell.o { color: var(--neon-red); }
+    .result-box { max-width: 620px; margin: 0 auto; text-align: center; }
+    .grade-badge { display: inline-block; width: 140px; height: 140px; line-height: 140px; border-radius: 50%; font-family: var(--font-pixel); font-size: 3rem; margin: 18px 0; border: 4px solid currentColor; }
+    .grade-S { color: var(--neon-yellow); box-shadow: 0 0 30px rgba(255,215,0,0.35); }
+    .grade-A { color: var(--neon-green); box-shadow: 0 0 26px rgba(0,255,136,0.28); }
+    .grade-B { color: var(--neon-blue); box-shadow: 0 0 24px rgba(0,212,255,0.28); }
+    .grade-C { color: var(--neon-red); box-shadow: 0 0 20px rgba(255,71,87,0.28); }
+    .result-detail { color: var(--text-secondary); font-size: 0.95rem; line-height: 1.8; }
+    .new-record { font-family: var(--font-pixel); color: var(--neon-yellow); font-size: 0.95rem; margin-top: 12px; }
+    .result-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 24px; }
+    .result-buttons .btn-primary, .result-buttons .btn-secondary { min-width: 140px; }
+    @media (max-width: 640px) {
+      .answer-grid { grid-template-columns: 1fr; }
+      .typing-row { flex-direction: column; }
+      .submit-btn { max-width: none; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">🎲 랜덤 패턴 마스터</span>
+  </nav>
+  <main class="game-container">
+    <section class="random-intro active" id="introScreen">
+      <h1>랜덤 패턴 마스터</h1>
+      <div class="boss-badge"><span class="boss-icon">👑</span> BOSS FINAL</div>
+      <div class="random-hint">매 라운드 다른 미니게임이 등장하는 최종 도전장입니다.</div>
+      <div class="random-rules">
+        <ul>
+          <li>🔀 매 라운드 숫자, 암산, 색깔, 퀴즈, 타이핑, 카드 매칭, 시퀀스 패턴, 틱택토, 체스 중 하나가 등장합니다.</li>
+          <li>🧠 정답을 맞히면 다음 레벨로 넘어가고, 틀리면 도전이 끝납니다.</li>
+          <li>⏱️ 각 문제에는 제한 시간이 있으니 빠르게 판단하세요.</li>
+          <li>🎯 12레벨을 클리어하면 최종 보스를 물리칠 수 있습니다.</li>
+        </ul>
+      </div>
+      <div class="random-best" id="introBest">최고 기록: 0 레벨</div>
+      <button class="btn-primary" id="startBtn">도전 시작</button>
+    </section>
+
+    <section class="random-play" id="playScreen">
+      <div class="random-hud">
+        <div class="hud-item"><span class="label">레벨</span><span class="value" id="levelVal">1</span></div>
+        <div class="hud-item"><span class="label">목숨</span><span class="value" id="livesVal">3</span></div>
+        <div class="hud-item"><span class="label">현재 미션</span><span class="value" id="missionVal">-</span></div>
+        <div class="hud-item"><span class="label">최고</span><span class="value" id="bestVal">0</span></div>
+      </div>
+      <div class="boss-panel">
+        <div class="boss-top">
+          <div class="boss-title">⚔️ BOSS: 랜덤 패턴 마스터</div>
+          <div class="boss-phase" id="bossPhase">페이즈 1</div>
+        </div>
+        <div class="boss-face">
+          <div class="boss-portrait" id="bossPortrait">😈</div>
+          <div class="boss-talk" id="bossTalk"><strong>보스:</strong> 네 패턴을 하나씩 뒤흔들어 보라!</div>
+        </div>
+        <div class="boss-bar"><span id="bossBar"></span></div>
+        <div class="boss-hp" id="bossHp">HP 12 / 12</div>
+      </div>
+      <div class="random-status ready" id="statusText">기다리는 중...</div>
+      <div class="timer-track" id="timerTrack"><div class="timer-fill" id="timerFill"></div></div>
+      <div class="challenge-card">
+        <div class="challenge-title" id="challengeTitle">미션</div>
+        <div class="challenge-prompt" id="challengePrompt">문제를 불러오는 중입니다...</div>
+        <div id="memoryHud"></div>
+        <div id="answerArea"></div>
+      </div>
+      <div class="random-hint" id="challengeHint">한 번에 하나의 미니게임을 깨워보세요.</div>
+    </section>
+
+    <section class="random-result" id="resultScreen">
+      <div class="result-box">
+        <h2 id="resultTitle">결과</h2>
+        <div class="boss-badge hidden-boss-ui"><span class="boss-icon">👑</span> BOSS FINAL</div>
+        <div class="grade-badge grade-C" id="gradeBadge">-</div>
+        <div class="result-detail">
+          <div>도달 레벨 <strong id="finalLevel">0</strong></div>
+          <div id="failReason">마지막 미션을 마무리했습니다.</div>
+        </div>
+        <div class="new-record" id="newRecord" style="display:none;">🎉 신기록!</div>
+        <div class="result-buttons">
+          <button class="btn-primary" id="retryBtn">다시 도전</button>
+          <a href="../index.html" class="btn-secondary">홈으로</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function () {
+      const $ = id => document.getElementById(id);
+      const introScreen = $('introScreen');
+      const playScreen = $('playScreen');
+      const resultScreen = $('resultScreen');
+      const startBtn = $('startBtn');
+      const retryBtn = $('retryBtn');
+      const levelVal = $('levelVal');
+      const missionVal = $('missionVal');
+      const bestVal = $('bestVal');
+      const statusText = $('statusText');
+      const challengeTitle = $('challengeTitle');
+      const challengePrompt = $('challengePrompt');
+      const memoryHud = $('memoryHud');
+      const answerArea = $('answerArea');
+      const challengeHint = $('challengeHint');
+      const timerTrack = $('timerTrack');
+      const bossPhase = $('bossPhase');
+      const bossBar = $('bossBar');
+      const bossHp = $('bossHp');
+      const bossPortrait = $('bossPortrait');
+      const bossTalk = $('bossTalk');
+      const timerFill = $('timerFill');
+      const introBest = $('introBest');
+      const livesVal = $('livesVal');
+      const gradeBadge = $('gradeBadge');
+      const finalLevel = $('finalLevel');
+      const failReason = $('failReason');
+      const newRecord = $('newRecord');
+      const resultTitle = $('resultTitle');
+
+      const WIN_LEVEL = 12;
+      const MAX_LIVES = 3;
+      const DIFFS = {
+        easy: { timeMul: 1.3 },
+        normal: { timeMul: 1.0 },
+        hard: { timeMul: 0.75 }
+      };
+      const difficulty = localStorage.getItem('pixelfun_random_diff') || 'normal';
+      let cleared = 0;
+      let currentChallenge = null;
+      let bossHealth = WIN_LEVEL;
+      let recentTypes = [];
+      let lives = MAX_LIVES;
+      let inputTimer = null;
+      let roundTimer = null;
+      let acceptingInput = false;
+      let timerActive = false;
+
+      function showScreen(screen) {
+        [introScreen, playScreen, resultScreen].forEach(s => s.classList.remove('active'));
+        screen.classList.add('active');
+      }
+
+      function loadBest() {
+        const best = parseInt(localStorage.getItem('pixelfun_random_best') || '0', 10);
+        introBest.textContent = `최고 기록: ${best} 레벨`;
+        bestVal.textContent = best;
+        return best;
+      }
+
+      function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+      function shuffle(arr) {
+        const copy = arr.slice();
+        for (let i = copy.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [copy[i], copy[j]] = [copy[j], copy[i]];
+        }
+        return copy;
+      }
+
+      function stopTimers() {
+        clearInterval(inputTimer);
+        clearTimeout(roundTimer);
+        inputTimer = null;
+        roundTimer = null;
+        timerActive = false;
+      }
+
+      function startRoundTimer() {
+        if (timerActive) return;
+        const total = Math.max(2400, 10000 - cleared * 260) * DIFFS[difficulty].timeMul;
+        let remaining = total;
+        timerTrack.classList.add('show');
+        timerFill.style.width = '100%';
+        timerFill.classList.remove('danger');
+        timerActive = true;
+        inputTimer = setInterval(() => {
+          remaining -= 50;
+          const pct = Math.max(0, (remaining / total) * 100);
+          timerFill.style.width = pct + '%';
+          if (pct <= 30) timerFill.classList.add('danger');
+          if (remaining <= 0) {
+            stopTimers();
+            fail('시간 초과!');
+          }
+        }, 50);
+      }
+
+      function updateHud() {
+        levelVal.textContent = cleared + 1;
+        livesVal.textContent = lives;
+        missionVal.textContent = currentChallenge ? currentChallenge.label : '-';
+      }
+
+      function updateBossDisplay() {
+        const remaining = Math.max(0, WIN_LEVEL - cleared);
+        bossHealth = remaining;
+        const phase = remaining > 8 ? 1 : remaining > 4 ? 2 : 3;
+        bossPhase.textContent = '페이즈 ' + phase;
+        bossBar.style.width = (remaining / WIN_LEVEL) * 100 + '%';
+        bossHp.textContent = 'HP ' + remaining + ' / ' + WIN_LEVEL;
+        if (phase === 1) {
+          bossPortrait.textContent = '😈';
+          bossTalk.innerHTML = '<strong>보스:</strong> 네 패턴을 하나씩 뒤흔들어 보라!';
+        } else if (phase === 2) {
+          bossPortrait.textContent = '👹';
+          bossTalk.innerHTML = '<strong>보스:</strong> 더 빨라진다... 네 한계를 시험해 보겠다!';
+        } else {
+          bossPortrait.textContent = '💀';
+          bossTalk.innerHTML = '<strong>보스:</strong> 마지막 공격이다... 버텨라!';
+        }
+      }
+
+      function setStatus(text, type) {
+        statusText.textContent = text;
+        statusText.className = 'random-status ' + (type || 'ready');
+      }
+
+      function renderMemoryChances(challenge) {
+        if (!memoryHud) return;
+        if (!challenge || challenge.type !== 'memory') {
+          memoryHud.innerHTML = '';
+          return;
+        }
+        const remaining = Math.max(0, 5 - (challenge.state ? challenge.state.mistakes : 0));
+        const items = [];
+        for (let i = 0; i < 5; i += 1) {
+          const active = i < remaining;
+          items.push('<span class="chance-pill' + (active ? ' active' : '') + '">' + (active ? '♥' : '♡') + '</span>');
+        }
+        memoryHud.innerHTML = '<div class="memory-hud">' + items.join('') + '</div>';
+      }
+
+      function flashSequencePad(pad, duration) {
+        return new Promise(function (resolve) {
+          if (!pad) return resolve();
+          pad.classList.add('lit');
+          if (window.PixelSound) PixelSound.play('flip');
+          setTimeout(function () {
+            pad.classList.remove('lit');
+            setTimeout(resolve, 90);
+          }, duration);
+        });
+      }
+
+      async function showSequenceChallenge(challenge) {
+        acceptingInput = false;
+        challenge.inputIndex = 0;
+        challenge.lives = 3;
+        challenge.shownHint = false;
+        setStatus('패턴을 기억하세요...', 'ready');
+        challengeHint.textContent = '순서를 기억했다가 그대로 따라 누르세요.';
+        await new Promise(function (resolve) { setTimeout(resolve, 700); });
+
+        const stepDur = Math.max(220, 480 - cleared * 12);
+        const gapDur = Math.max(110, 220 - cleared * 6);
+        for (let i = 0; i < challenge.sequence.length; i++) {
+          await flashSequencePad(challenge.padButtons[challenge.sequence[i]], stepDur);
+          if (i < challenge.sequence.length - 1) {
+            await new Promise(function (resolve) { setTimeout(resolve, gapDur); });
+          }
+        }
+
+        acceptingInput = true;
+        setStatus('이제 따라 누르세요!', 'ready');
+        challengeHint.textContent = '보이는 순서를 그대로 눌러 보세요.';
+        startRoundTimer();
+      }
+
+      function handleSequencePadSelection(index) {
+        if (!acceptingInput || !currentChallenge || currentChallenge.type !== 'sequence') return;
+        const challenge = currentChallenge;
+        const expected = challenge.sequence[challenge.inputIndex];
+        if (index !== expected) {
+          challenge.lives -= 1;
+          if (challenge.lives > 0) {
+            setStatus('틀렸어요! 기회 ' + challenge.lives + '번 남았어요.', 'fail');
+            challengeHint.textContent = '한번 더 맞춰보세요. 남은 기회: ' + challenge.lives;
+            return;
+          }
+          fail('패턴이 달랐습니다!');
+          return;
+        }
+        challenge.inputIndex += 1;
+        const pad = challenge.padButtons[index];
+        if (pad) {
+          pad.classList.add('lit');
+          setTimeout(function () { pad.classList.remove('lit'); }, 140);
+        }
+        if (challenge.inputIndex >= challenge.sequence.length) {
+          acceptingInput = false;
+          stopTimers();
+          resetTimerForNextRound();
+          completeLevel();
+        } else {
+          setStatus('좋아요! 계속 이어서 누르세요.', 'ready');
+        }
+      }
+
+      const CHESS_GLYPH = {
+        w: { k: '♔', q: '♕', r: '♖', b: '♗', n: '♘', p: '♙' },
+        b: { k: '♚', q: '♛', r: '♜', b: '♝', n: '♞', p: '♟' }
+      };
+
+      function getTicTacToeWinner(board) {
+        const lines = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+        for (let i = 0; i < lines.length; i += 1) {
+          const [a, b, c] = lines[i];
+          if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+        }
+        if (board.every(function (v) { return v; })) return 'draw';
+        return null;
+      }
+
+      function inBounds(r, c) {
+        return r >= 0 && r < 8 && c >= 0 && c < 8;
+      }
+
+      function rawChessMoves(board, r, c) {
+        const piece = board[r][c];
+        if (!piece) return [];
+        const moves = [];
+        const enemy = piece.color === 'w' ? 'b' : 'w';
+
+        const step = function (dr, dc) {
+          const nr = r + dr;
+          const nc = c + dc;
+          if (!inBounds(nr, nc)) return;
+          const target = board[nr][nc];
+          if (!target || target.color === enemy) moves.push({ r: nr, c: nc });
+        };
+
+        const slide = function (dr, dc) {
+          let nr = r + dr;
+          let nc = c + dc;
+          while (inBounds(nr, nc)) {
+            const target = board[nr][nc];
+            if (!target) {
+              moves.push({ r: nr, c: nc });
+            } else {
+              if (target.color === enemy) moves.push({ r: nr, c: nc });
+              break;
+            }
+            nr += dr;
+            nc += dc;
+          }
+        };
+
+        switch (piece.type) {
+          case 'p': {
+            const dir = piece.color === 'w' ? -1 : 1;
+            const forward = board[r + dir] && board[r + dir][c];
+            if (inBounds(r + dir, c) && !forward) moves.push({ r: r + dir, c });
+            for (const dc of [-1, 1]) {
+              const nr = r + dir;
+              const nc = c + dc;
+              if (inBounds(nr, nc) && board[nr][nc] && board[nr][nc].color === enemy) moves.push({ r: nr, c: nc });
+            }
+            break;
+          }
+          case 'n': {
+            [[-2,-1],[-2,1],[-1,-2],[-1,2],[1,-2],[1,2],[2,-1],[2,1]].forEach(function (d) {
+              step(d[0], d[1]);
+            });
+            break;
+          }
+          case 'b': {
+            slide(-1,-1); slide(-1,1); slide(1,-1); slide(1,1);
+            break;
+          }
+          case 'r': {
+            slide(-1,0); slide(1,0); slide(0,-1); slide(0,1);
+            break;
+          }
+          case 'q': {
+            slide(-1,-1); slide(-1,1); slide(1,-1); slide(1,1);
+            slide(-1,0); slide(1,0); slide(0,-1); slide(0,1);
+            break;
+          }
+          case 'k': {
+            for (let dr = -1; dr <= 1; dr += 1) {
+              for (let dc = -1; dc <= 1; dc += 1) {
+                if (dr === 0 && dc === 0) continue;
+                step(dr, dc);
+              }
+            }
+            break;
+          }
+        }
+        return moves;
+      }
+
+      function findKing(board, color) {
+        for (let r = 0; r < 8; r += 1) {
+          for (let c = 0; c < 8; c += 1) {
+            const piece = board[r][c];
+            if (piece && piece.type === 'k' && piece.color === color) return { r: r, c: c };
+          }
+        }
+        return null;
+      }
+
+      function isInCheck(board, color) {
+        const king = findKing(board, color);
+        if (!king) return false;
+        for (let r = 0; r < 8; r += 1) {
+          for (let c = 0; c < 8; c += 1) {
+            const piece = board[r][c];
+            if (!piece || piece.color === color) continue;
+            const moves = rawChessMoves(board, r, c);
+            if (moves.some(function (m) { return m.r === king.r && m.c === king.c; })) return true;
+          }
+        }
+        return false;
+      }
+
+      function getChessLegalMoves(challenge, r, c) {
+        const piece = challenge.board[r][c];
+        if (!piece || piece.color !== 'w') return [];
+        return rawChessMoves(challenge.board, r, c);
+      }
+
+      function renderChessBoard(challenge) {
+        if (!challenge || !challenge.boardEl) return;
+        challenge.boardEl.innerHTML = '';
+        const checkSquare = isInCheck(challenge.board, 'b') ? findKing(challenge.board, 'b') : null;
+        for (let r = 0; r < 8; r += 1) {
+          for (let c = 0; c < 8; c += 1) {
+            const sq = document.createElement('button');
+            sq.type = 'button';
+            sq.className = 'mini-square ' + (((r + c) % 2 === 0) ? 'light' : 'dark');
+            if (challenge.selected && challenge.selected.r === r && challenge.selected.c === c) sq.classList.add('selected');
+            if (checkSquare && checkSquare.r === r && checkSquare.c === c) sq.classList.add('in-check');
+            sq.dataset.r = r;
+            sq.dataset.c = c;
+            const piece = challenge.board[r][c];
+            if (piece) {
+              const span = document.createElement('span');
+              span.className = 'mini-piece ' + piece.color;
+              span.textContent = CHESS_GLYPH[piece.color][piece.type];
+              sq.appendChild(span);
+            }
+            if (challenge.selected) {
+              const isLegal = challenge.legalMoves.some(function (m) { return m.r === r && m.c === c; });
+              if (isLegal) {
+                const dot = document.createElement('div');
+                dot.className = 'dot';
+                sq.appendChild(dot);
+              }
+            }
+            sq.addEventListener('click', function () {
+              const r2 = parseInt(this.dataset.r, 10);
+              const c2 = parseInt(this.dataset.c, 10);
+              const piece2 = challenge.board[r2][c2];
+              if (challenge.selected) {
+                const move = challenge.legalMoves.find(function (m) { return m.r === r2 && m.c === c2; });
+                if (move) {
+                  if (piece2 && piece2.color === 'b' && piece2.type === 'k') {
+                    completeLevel();
+                  } else {
+                    fail('잘못된 수입니다!');
+                  }
+                  return;
+                }
+              }
+              if (piece2 && piece2.color === 'w') {
+                challenge.selected = { r: r2, c: c2 };
+                challenge.legalMoves = getChessLegalMoves(challenge, r2, c2);
+                challenge.renderBoard();
+              }
+            });
+            challenge.boardEl.appendChild(sq);
+          }
+        }
+      }
+
+      function getTicTacToeWinner(board) {
+        const lines = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+        for (let i = 0; i < lines.length; i += 1) {
+          const [a, b, c] = lines[i];
+          if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+        }
+        if (board.every(function (v) { return v; })) return 'draw';
+        return null;
+      }
+
+      function getEasyTicTacToeMove(board) {
+        const empties = getEmptyTicTacToeCells(board);
+        for (let i = 0; i < empties.length; i += 1) {
+          const idx = empties[i];
+          board[idx] = 'O';
+          if (getTicTacToeWinner(board) === 'O') {
+            board[idx] = null;
+            return idx;
+          }
+          board[idx] = null;
+        }
+        for (let i = 0; i < empties.length; i += 1) {
+          const idx = empties[i];
+          board[idx] = 'X';
+          if (getTicTacToeWinner(board) === 'X') {
+            board[idx] = null;
+            return idx;
+          }
+          board[idx] = null;
+        }
+        if (board[4] == null) return 4;
+        const corners = [0, 2, 6, 8].filter(function (idx) { return board[idx] == null; });
+        if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
+        return empties[Math.floor(Math.random() * empties.length)];
+      }
+
+      function renderTicTacToeBoard(challenge) {
+        if (!challenge || !challenge.boardEl) return;
+        challenge.boardEl.innerHTML = '';
+        challenge.board.forEach(function (value, index) {
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'mini-ttt-cell' + (value ? ' ' + value.toLowerCase() : '');
+          btn.textContent = value || '';
+          btn.addEventListener('click', function () {
+            if (!acceptingInput || challenge.turn !== 'human') return;
+            if (challenge.board[index]) return;
+            challenge.board[index] = 'X';
+            challenge.renderBoard();
+            const result = getTicTacToeWinner(challenge.board);
+            if (result === 'X') {
+              acceptingInput = false;
+              stopTimers();
+              resetTimerForNextRound();
+              completeLevel();
+              return;
+            }
+            if (result === 'draw') {
+              acceptingInput = false;
+              stopTimers();
+              resetTimerForNextRound();
+              completeLevel();
+              return;
+            }
+            challenge.turn = 'ai';
+            acceptingInput = false;
+            setStatus('AI가 두고 있어요...', 'ready');
+            stopTimers();
+            setTimeout(function () {
+              const aiMove = getEasyTicTacToeMove(challenge.board);
+              challenge.board[aiMove] = 'O';
+              challenge.renderBoard();
+              const aiResult = getTicTacToeWinner(challenge.board);
+              if (aiResult === 'O') {
+                fail('AI가 승리했습니다.');
+                return;
+              }
+              if (aiResult === 'draw') {
+                acceptingInput = false;
+                stopTimers();
+                resetTimerForNextRound();
+                completeLevel();
+                return;
+              }
+              challenge.turn = 'human';
+              acceptingInput = true;
+              setStatus('당신의 차례입니다.', 'ready');
+              startRoundTimer();
+            }, 350);
+          });
+          challenge.boardEl.appendChild(btn);
+        });
+      }
+
+      function renderChallenge(challenge) {
+        stopTimers();
+        currentChallenge = challenge;
+        challengeTitle.textContent = challenge.title;
+        challengePrompt.innerHTML = challenge.prompt;
+        answerArea.innerHTML = '';
+        memoryHud.innerHTML = '';
+        setStatus(challenge.status || '도전하세요!', 'ready');
+        challengeHint.textContent = challenge.hint || '다음 미션도 준비됩니다.';
+        updateHud();
+
+        if (challenge.type === 'number') {
+          const wrap = document.createElement('div');
+          wrap.className = 'typing-row';
+          const input = document.createElement('input');
+          input.className = 'typing-input';
+          input.type = 'number';
+          input.min = '1';
+          input.max = '100';
+          input.placeholder = '1~100';
+          const btn = document.createElement('button');
+          btn.className = 'submit-btn';
+          btn.textContent = '제출';
+          btn.addEventListener('click', function () {
+            submitNumberAnswer(input.value.trim());
+          });
+          input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') submitNumberAnswer(input.value.trim());
+          });
+          wrap.appendChild(input);
+          wrap.appendChild(btn);
+          answerArea.appendChild(wrap);
+          input.focus();
+        } else if (challenge.type === 'math') {
+          const wrap = document.createElement('div');
+          wrap.className = 'typing-row';
+          const input = document.createElement('input');
+          input.className = 'typing-input';
+          input.type = 'number';
+          input.placeholder = '정답 입력';
+          const btn = document.createElement('button');
+          btn.className = 'submit-btn';
+          btn.textContent = '제출';
+          btn.addEventListener('click', function () {
+            submitMathAnswer(input.value.trim());
+          });
+          input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') submitMathAnswer(input.value.trim());
+          });
+          wrap.appendChild(input);
+          wrap.appendChild(btn);
+          answerArea.appendChild(wrap);
+          input.focus();
+        } else if (challenge.type === 'typing') {
+          const wrap = document.createElement('div');
+          wrap.className = 'typing-row';
+          const input = document.createElement('input');
+          input.className = 'typing-input';
+          input.placeholder = '문자를 입력하세요';
+          const btn = document.createElement('button');
+          btn.className = 'submit-btn';
+          btn.textContent = '확인';
+          btn.addEventListener('click', function () {
+            submitTypingAnswer(input.value.trim());
+          });
+          input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') submitTypingAnswer(input.value.trim());
+          });
+          wrap.appendChild(input);
+          wrap.appendChild(btn);
+          answerArea.appendChild(wrap);
+          input.focus();
+        } else if (challenge.type === 'quiz') {
+          const grid = document.createElement('div');
+          grid.className = 'answer-grid';
+          challenge.options.forEach(function (option) {
+            const btn = document.createElement('button');
+            btn.className = 'answer-btn';
+            btn.textContent = option.text;
+            btn.addEventListener('click', function () {
+              submitQuizAnswer(option.value);
+            });
+            grid.appendChild(btn);
+          });
+          answerArea.appendChild(grid);
+        } else if (challenge.type === 'color') {
+          const grid = document.createElement('div');
+          grid.className = 'answer-grid';
+          challenge.options.forEach(function (option) {
+            const btn = document.createElement('button');
+            btn.className = 'answer-btn color-choice';
+            btn.style.background = option.color;
+            btn.style.minHeight = '84px';
+            btn.addEventListener('click', function () {
+              submitColorAnswer(option.value);
+            });
+            grid.appendChild(btn);
+          });
+          answerArea.appendChild(grid);
+        } else if (challenge.type === 'memory') {
+          const board = document.createElement('div');
+          board.className = 'memory-board';
+          const grid = document.createElement('div');
+          grid.className = 'memory-grid';
+          const cards = challenge.cards || [];
+          const renderCards = function () {
+            grid.innerHTML = '';
+            cards.forEach(function (card, index) {
+              const btn = document.createElement('button');
+              btn.type = 'button';
+              btn.className = 'memory-card' + (card.matched ? ' matched' : '') + (card.revealed ? ' revealed' : '');
+              btn.textContent = card.revealed || card.matched ? card.value : '?';
+              btn.addEventListener('click', function () {
+                submitMemorySelection(index);
+              });
+              grid.appendChild(btn);
+            });
+          };
+          challenge.renderCards = renderCards;
+          renderMemoryChances(challenge);
+          board.appendChild(grid);
+          answerArea.appendChild(board);
+          cards.forEach(function (card) { if (!card.matched) card.revealed = true; });
+          renderCards();
+          acceptingInput = false;
+          timerTrack.classList.remove('show');
+          timerFill.style.width = '100%';
+          setStatus('카드를 기억해 보세요...', 'ready');
+          setTimeout(function () {
+            cards.forEach(function (card) { if (!card.matched) card.revealed = false; });
+            renderCards();
+            setStatus('짝을 맞춰보세요.', 'ready');
+            acceptingInput = true;
+            startRoundTimer();
+          }, 1400);
+        } else if (challenge.type === 'sequence') {
+          const board = document.createElement('div');
+          board.className = 'sequence-board';
+          const pads = [];
+          for (let i = 0; i < 9; i += 1) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'sequence-pad c' + i;
+            btn.addEventListener('click', function () {
+              handleSequencePadSelection(i);
+            });
+            board.appendChild(btn);
+            pads.push(btn);
+          }
+          challenge.padButtons = pads;
+          answerArea.appendChild(board);
+          showSequenceChallenge(challenge);
+        } else if (challenge.type === 'tictactoe') {
+          const board = document.createElement('div');
+          board.className = 'mini-ttt-board';
+          challenge.board = challenge.board || Array(9).fill(null);
+          challenge.turn = 'human';
+          challenge.boardEl = board;
+          challenge.renderBoard = function () {
+            renderTicTacToeBoard(challenge);
+          };
+          answerArea.appendChild(board);
+          challenge.renderBoard();
+          acceptingInput = true;
+          startRoundTimer();
+        } else if (challenge.type === 'chess') {
+          const board = document.createElement('div');
+          board.className = 'mini-chess-board';
+          challenge.boardEl = board;
+          challenge.selected = null;
+          challenge.legalMoves = [];
+          challenge.renderBoard = function () {
+            renderChessBoard(challenge);
+          };
+          answerArea.appendChild(board);
+          challenge.renderBoard();
+          acceptingInput = true;
+          startRoundTimer();
+        } else {
+          const grid = document.createElement('div');
+          grid.className = 'answer-grid';
+          challenge.options.forEach(function (option) {
+            const btn = document.createElement('button');
+            btn.className = 'answer-btn';
+            btn.textContent = option.text;
+            btn.addEventListener('click', function () {
+              submitAnswer(option.value);
+            });
+            grid.appendChild(btn);
+          });
+          answerArea.appendChild(grid);
+        }
+
+        if (challenge.type !== 'memory' && challenge.type !== 'sequence') {
+          acceptingInput = true;
+          startRoundTimer();
+        }
+      }
+
+      function chooseChallenge() {
+        const types = ['number', 'math', 'color', 'quiz', 'typing', 'memory', 'sequence', 'tictactoe', 'chess'];
+        const type = types[randInt(0, types.length - 1)];
+        recentTypes = [];
+        if (type === 'number') {
+          const base = randInt(10, 60);
+          const delta = randInt(1, 8);
+          const op = ['+', '-'][randInt(0, 1)];
+          let prompt = '';
+          let answer = 0;
+          if (op === '+') {
+            answer = base + delta;
+            prompt = '기준 숫자 ' + base + '에서 ' + delta + '를 더한 값은?';
+          } else {
+            answer = base - delta;
+            prompt = '기준 숫자 ' + base + '에서 ' + delta + '를 뺀 값은?';
+          }
+          const options = shuffle([answer, answer + 2, answer - 3, answer + 5]).map(function (value) {
+            return { value: value, text: String(value) };
+          });
+          return {
+            type: 'number',
+            title: '숫자 맞추기',
+            label: '숫자',
+            prompt: prompt,
+            options: options,
+            answer: answer,
+            hint: '계산해 보고 가장 알맞은 숫자를 고르세요.'
+          };
+        }
+        if (type === 'math') {
+          const a = randInt(2, 12);
+          const b = randInt(2, 12);
+          const op = ['+', '-', '×'][randInt(0, 2)];
+          let expr = '';
+          let correct = 0;
+          if (op === '+') { correct = a + b; expr = a + ' + ' + b; }
+          if (op === '-') { correct = a - b; expr = a + ' - ' + b; }
+          if (op === '×') { correct = a * b; expr = a + ' × ' + b; }
+          return {
+            type: 'math',
+            title: '암산 챌린지',
+            label: '암산',
+            prompt: '다음 계산의 답을 입력하세요: <strong>' + expr + '</strong>',
+            answer: correct,
+            hint: '머릿속으로 계산해 보세요.'
+          };
+        }
+        if (type === 'color') {
+          const palette = [
+            { name: '빨강', hex: '#ff4757' },
+            { name: '파랑', hex: '#1e90ff' },
+            { name: '초록', hex: '#2ed573' },
+            { name: '노랑', hex: '#ffd700' },
+            { name: '보라', hex: '#9b59b6' },
+            { name: '주황', hex: '#ff8c1a' },
+            { name: '분홍', hex: '#ff6ec7' }
+          ];
+          const wordIdx = randInt(0, palette.length - 1);
+          let colorIdx;
+          do {
+            colorIdx = randInt(0, palette.length - 1);
+          } while (colorIdx === wordIdx);
+          const wordObj = palette[wordIdx];
+          const colorObj = palette[colorIdx];
+          const others = palette.filter(function (item) {
+            return item.name !== colorObj.name;
+          });
+          const picks = shuffle(others).slice(0, 3);
+          const options = shuffle([colorObj, ...picks]).map(function (item) {
+            return {
+              value: item.name,
+              color: item.hex
+            };
+          });
+          return {
+            type: 'color',
+            title: '색깔 맞추기',
+            label: '색깔',
+            prompt: '<span style="display:inline-block; color:' + colorObj.hex + '; font-weight:700; font-size:2rem; text-shadow:0 0 14px ' + colorObj.hex + ';">' + wordObj.name + '</span>',
+            options: options,
+            answer: colorObj.name,
+            hint: '단어의 글자색과 같은 색을 고르세요.'
+          };
+        }
+        if (type === 'quiz') {
+          const questions = [
+            { q: '바다는 대부분 물로 이루어져 있다.', a: 'O' },
+            { q: '태양은 지구 주위를 돈다.', a: 'X' },
+            { q: '1초는 1000밀리초이다.', a: 'O' },
+            { q: '물은 100도에서 얼어버린다.', a: 'X' }
+          ];
+          const item = questions[randInt(0, questions.length - 1)];
+          return {
+            type: 'quiz',
+            title: 'OX 퀴즈',
+            label: '퀴즈',
+            prompt: item.q,
+            options: [{ value: 'O', text: 'O' }, { value: 'X', text: 'X' }],
+            answer: item.a,
+            hint: 'O/X로 판단하세요.'
+          };
+        }
+        if (type === 'typing') {
+          const words = ['미니게임', '퍼즐왕', '브레인', '로켓', '반짝임', '챌린지'];
+          const word = words[randInt(0, words.length - 1)];
+          return {
+            type: 'typing',
+            title: '타이핑 게임',
+            label: '타이핑',
+            prompt: '아래 단어를 정확하게 입력하세요: <strong>' + word + '</strong>',
+            answer: word,
+            hint: '대소문자를 구분해 입력해 주세요.'
+          };
+        }
+        if (type === 'sequence') {
+          const length = Math.min(6, 3 + Math.floor(cleared / 3));
+          const seq = [];
+          for (let i = 0; i < length; i += 1) {
+            seq.push(randInt(0, 8));
+          }
+          return {
+            type: 'sequence',
+            title: '시퀀스 마스터',
+            label: '시퀀스',
+            prompt: '보이는 패턴을 그대로 기억했다가 따라 눌러보세요.',
+            sequence: seq,
+            hint: '순서가 길수록 집중력이 중요합니다.'
+          };
+        }
+        if (type === 'tictactoe') {
+          return {
+            type: 'tictactoe',
+            title: '틱택토',
+            label: '틱택토',
+            prompt: 'AI와 3목 대결! 쉬움 난이도로 이겨보세요.',
+            hint: '가로·세로·대각선으로 먼저 3개를 완성하세요.'
+          };
+        }
+        if (type === 'chess') {
+          return {
+            type: 'chess',
+            title: '체스 돌파',
+            label: '체스',
+            prompt: '상대 킹이 체크 상태입니다. 킹을 잡을 수 있는 한 수를 선택하세요.',
+            board: [
+              [null, null, { type: 'k', color: 'b' }, null, null, null, null, null],
+              [null, null, null, null, null, null, null, null],
+              [null, null, { type: 'q', color: 'w' }, null, null, null, null, null],
+              [null, { type: 'n', color: 'w' }, null, null, null, null, null, null],
+              [null, null, null, null, null, null, null, null],
+              [null, null, null, null, null, null, null, null],
+              [null, null, null, null, { type: 'k', color: 'w' }, null, null, null],
+              [null, null, null, null, null, null, null, null]
+            ],
+            hint: '오직 한 수만 상대 킹을 잡을 수 있습니다.'
+          };
+        }
+        const values = ['♥', '♦', '♣', '♠'];
+        const cards = shuffle(values.concat(values)).map(function (value, index) {
+          return { value: value, revealed: false, matched: false, id: index };
+        });
+        return {
+          type: 'memory',
+          title: '카드 뒤집기',
+          label: '카드',
+          prompt: '카드를 뒤집어 같은 문양을 찾으세요.',
+          cards: cards,
+          hint: '처음엔 전부 보였다가 사라집니다.'
+        };
+      }
+
+      function nextRound() {
+        stopTimers();
+        if (cleared >= WIN_LEVEL) {
+          return endGame(true);
+        }
+        const challenge = chooseChallenge();
+        renderChallenge(challenge);
+      }
+
+      function completeLevel() {
+        if (window.PixelSound) PixelSound.play('success');
+        cleared += 1;
+        updateBossDisplay();
+        setStatus('정답! 보스에게 데미지를 입혔습니다.', 'ready');
+        challengeHint.textContent = `좋아요! ${cleared}레벨까지 도달했고, 보스 HP가 ${bossHealth}로 줄었습니다.`;
+        roundTimer = setTimeout(nextRound, 620);
+      }
+
+      function resetTimerForNextRound() {
+        stopTimers();
+        timerTrack.classList.remove('show');
+        timerFill.style.width = '100%';
+      }
+
+      function submitNumberAnswer(value) {
+        if (!acceptingInput) return;
+        acceptingInput = false;
+        stopTimers();
+        const normalized = Number(value);
+        if (!isNaN(normalized) && normalized === currentChallenge.answer) {
+          resetTimerForNextRound();
+          completeLevel();
+        } else {
+          fail('틀렸습니다!');
+        }
+      }
+
+      function submitMathAnswer(value) {
+        if (!acceptingInput) return;
+        acceptingInput = false;
+        stopTimers();
+        const normalized = Number(value);
+        if (!isNaN(normalized) && normalized === currentChallenge.answer) {
+          resetTimerForNextRound();
+          completeLevel();
+        } else {
+          fail('틀렸습니다!');
+        }
+      }
+
+      function submitTypingAnswer(value) {
+        if (!acceptingInput) return;
+        acceptingInput = false;
+        stopTimers();
+        if (String(value).trim() === String(currentChallenge.answer)) {
+          resetTimerForNextRound();
+          completeLevel();
+        } else {
+          fail('단어가 달랐습니다!');
+        }
+      }
+
+      function submitQuizAnswer(value) {
+        if (!acceptingInput) return;
+        acceptingInput = false;
+        stopTimers();
+        if (String(value) === String(currentChallenge.answer)) {
+          resetTimerForNextRound();
+          completeLevel();
+        } else {
+          fail('오답입니다!');
+        }
+      }
+
+      function submitColorAnswer(value) {
+        if (!acceptingInput) return;
+        acceptingInput = false;
+        stopTimers();
+        if (String(value) === String(currentChallenge.answer)) {
+          resetTimerForNextRound();
+          completeLevel();
+        } else {
+          fail('오답입니다!');
+        }
+      }
+
+      function submitMemorySelection(index) {
+        if (!acceptingInput || !currentChallenge || currentChallenge.type !== 'memory') return;
+        const cards = currentChallenge.cards || [];
+        const card = cards[index];
+        if (!card || card.matched || card.revealed) return;
+
+        if (!currentChallenge.state) currentChallenge.state = { firstIndex: null, mistakes: 0, matched: 0, pending: false };
+        const state = currentChallenge.state;
+
+        if (state.pending) return;
+
+        card.revealed = true;
+        currentChallenge.renderCards();
+
+        if (state.firstIndex === null) {
+          state.firstIndex = index;
+          return;
+        }
+
+        const first = cards[state.firstIndex];
+        state.pending = true;
+        if (first.value === card.value) {
+          first.matched = true;
+          card.matched = true;
+          state.firstIndex = null;
+          state.pending = false;
+          state.matched += 2;
+          setStatus('짝 맞췄어요! 계속!', 'ready');
+          if (state.matched >= cards.length) {
+            acceptingInput = false;
+            stopTimers();
+            resetTimerForNextRound();
+            completeLevel();
+          } else {
+            currentChallenge.renderCards();
+            setTimeout(function () {
+              acceptingInput = true;
+              startRoundTimer();
+            }, 350);
+          }
+        } else {
+          state.mistakes += 1;
+          renderMemoryChances(currentChallenge);
+          acceptingInput = false;
+          stopTimers();
+          timerTrack.classList.remove('show');
+          timerFill.style.width = '100%';
+          timerFill.classList.remove('danger');
+          setStatus('틀렸어요! 다시 확인해보세요.', 'fail');
+          setTimeout(function () {
+            first.revealed = false;
+            card.revealed = false;
+            state.firstIndex = null;
+            state.pending = false;
+            currentChallenge.renderCards();
+            if (state.mistakes >= 5) {
+              fail('기회를 모두 사용했습니다.');
+            } else {
+              acceptingInput = true;
+              startRoundTimer();
+              setStatus('다시 시도하세요.', 'ready');
+            }
+          }, 700);
+        }
+      }
+
+      function fail(reason) {
+        acceptingInput = false;
+        stopTimers();
+        if (window.PixelSound) PixelSound.play('fail');
+        lives -= 1;
+        updateHud();
+        const message = lives > 0 ? reason + ' 남은 목숨 ' + lives + '개입니다.' : reason;
+        statusText.textContent = message;
+        statusText.className = 'random-status fail';
+        if (lives > 0) {
+          roundTimer = setTimeout(function () {
+            resetTimerForNextRound();
+            nextRound();
+          }, 900);
+        } else {
+          roundTimer = setTimeout(() => endGame(false), 700);
+        }
+      }
+
+      function getGrade(levelValue) {
+        if (levelValue >= 10) return 'S';
+        if (levelValue >= 7) return 'A';
+        if (levelValue >= 4) return 'B';
+        return 'C';
+      }
+
+      function endGame(victory) {
+        acceptingInput = false;
+        stopTimers();
+        const reached = cleared;
+        const best = parseInt(localStorage.getItem('pixelfun_random_best') || '0', 10);
+        const isNewRecord = reached > best;
+        if (isNewRecord) localStorage.setItem('pixelfun_random_best', reached);
+        const grade = victory ? 'S' : getGrade(reached);
+        gradeBadge.textContent = grade;
+        gradeBadge.className = 'grade-badge grade-' + grade;
+        finalLevel.textContent = reached;
+        failReason.textContent = victory ? '최종 보스를 처치했습니다!' : `마지막 미션에서 ${reached}레벨까지 도달했습니다.`;
+        resultTitle.textContent = victory ? '승리!' : '도전 종료';
+        newRecord.style.display = isNewRecord ? 'block' : 'none';
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: {
+            game: 'random',
+            score: reached,
+            grade: grade,
+            outcome: victory ? 'win' : 'lose',
+            isNewRecord: isNewRecord
+          }
+        }));
+        showScreen(resultScreen);
+      }
+
+      function startGame() {
+        cleared = 0;
+        currentChallenge = null;
+        recentTypes = [];
+        lives = MAX_LIVES;
+        acceptingInput = false;
+        stopTimers();
+        loadBest();
+        updateBossDisplay();
+        updateHud();
+        showScreen(playScreen);
+        nextRound();
+      }
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+      loadBest();
+    })();
+  </script>
+</body>
+</html>

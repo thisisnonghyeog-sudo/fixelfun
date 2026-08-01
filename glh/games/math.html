@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>암산 챌린지 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .math-intro, .math-play, .math-result { display: none; }
+    .math-intro.active, .math-play.active, .math-result.active { display: block; }
+
+    .math-intro {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .math-intro h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      font-size: 1.8rem;
+      margin-bottom: 24px;
+      text-shadow: 0 0 12px rgba(123, 47, 247, 0.7);
+    }
+    .math-intro p {
+      color: var(--text-secondary);
+      line-height: 1.8;
+      margin-bottom: 12px;
+    }
+    .math-best {
+      color: var(--neon-yellow);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9rem;
+      margin: 20px 0;
+    }
+
+    .math-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 30px;
+      flex-wrap: wrap;
+    }
+    .hud-item {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-purple);
+      border-radius: 12px;
+      padding: 12px 18px;
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      box-shadow: 0 0 14px rgba(123, 47, 247, 0.25);
+    }
+    .hud-item .label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .hud-item .value {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.3rem;
+    }
+    .hud-item.timer .value { color: var(--neon-yellow); }
+    .hud-item.timer.warning .value { color: var(--neon-red); animation: pulse 0.6s infinite; }
+    .hud-item.combo .value { color: var(--neon-green); }
+
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.15); }
+    }
+
+    .question-card {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-blue);
+      border-radius: 16px;
+      padding: 50px 20px;
+      text-align: center;
+      box-shadow: 0 0 24px rgba(0, 212, 255, 0.3);
+      margin-bottom: 24px;
+    }
+    .question {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--text-primary);
+      font-size: 2.4rem;
+      margin-bottom: 30px;
+      letter-spacing: 4px;
+    }
+    .answer-input {
+      width: 220px;
+      max-width: 100%;
+      padding: 14px;
+      background: var(--bg-main);
+      border: 2px solid var(--neon-purple);
+      border-radius: 8px;
+      color: var(--text-primary);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1.5rem;
+      text-align: center;
+      outline: none;
+      transition: all 0.3s ease;
+    }
+    .answer-input:focus {
+      border-color: var(--neon-blue);
+      box-shadow: 0 0 12px rgba(0, 212, 255, 0.5);
+    }
+    .answer-input.correct {
+      border-color: var(--neon-green);
+      box-shadow: 0 0 16px var(--neon-green);
+    }
+    .answer-input.wrong {
+      border-color: var(--neon-red);
+      box-shadow: 0 0 16px var(--neon-red);
+      animation: shake 0.4s;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      25% { transform: translateX(-8px); }
+      75% { transform: translateX(8px); }
+    }
+
+    .feedback {
+      min-height: 30px;
+      font-family: 'Press Start 2P', cursive;
+      margin-top: 16px;
+      font-size: 1rem;
+    }
+    .feedback.correct { color: var(--neon-green); }
+    .feedback.wrong { color: var(--neon-red); }
+
+    .combo-floater {
+      position: fixed;
+      top: 30%;
+      left: 50%;
+      transform: translateX(-50%);
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 2rem;
+      text-shadow: 0 0 18px var(--neon-yellow);
+      pointer-events: none;
+      opacity: 0;
+      transition: all 0.6s ease;
+      z-index: 10;
+    }
+    .combo-floater.show {
+      opacity: 1;
+      top: 25%;
+    }
+
+    .math-result {
+      text-align: center;
+      padding: 30px 20px;
+    }
+    .grade-badge {
+      display: inline-block;
+      width: 160px;
+      height: 160px;
+      line-height: 160px;
+      border-radius: 50%;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 4rem;
+      margin: 20px 0;
+      border: 4px solid currentColor;
+    }
+    .grade-S { color: var(--neon-yellow); box-shadow: 0 0 36px var(--neon-yellow); }
+    .grade-A { color: var(--neon-green); box-shadow: 0 0 30px var(--neon-green); }
+    .grade-B { color: var(--neon-blue); box-shadow: 0 0 24px var(--neon-blue); }
+    .grade-C { color: var(--neon-red); box-shadow: 0 0 20px var(--neon-red); }
+
+    .result-stats {
+      margin: 24px 0;
+      color: var(--text-secondary);
+    }
+    .result-stats .big {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.6rem;
+      display: block;
+      margin: 6px 0;
+    }
+    .new-record {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 1.1rem;
+      margin: 14px 0;
+      animation: pulse 1s infinite;
+    }
+    .result-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 24px;
+    }
+    .result-buttons .btn-primary,
+    .result-buttons .btn-secondary {
+      min-width: 140px;
+    }
+
+    @media (max-width: 600px) {
+      .question { font-size: 1.6rem; }
+      .grade-badge { width: 120px; height: 120px; line-height: 120px; font-size: 3rem; }
+      .hud-item .value { font-size: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">암산 챌린지</span>
+  </nav>
+
+  <main class="game-container">
+    <!-- 인트로 -->
+    <section class="math-intro active" id="introScreen">
+      <h1>암산 챌린지</h1>
+      <p>60초 안에 최대한 많은 사칙연산 문제를 풀어보세요!</p>
+      <p>연속 정답 시 콤보 보너스를 획득합니다 (5콤보 이상부터).</p>
+      <div class="math-best" id="introBest">최고 기록: 0</div>
+      <button class="btn-primary" id="startBtn">게임 시작</button>
+    </section>
+
+    <!-- 플레이 -->
+    <section class="math-play" id="playScreen">
+      <div class="math-hud">
+        <div class="hud-item timer" id="timerBox">
+          <span class="label">남은 시간</span>
+          <span class="value" id="timerVal">60</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">점수</span>
+          <span class="value" id="scoreVal">0</span>
+        </div>
+        <div class="hud-item combo">
+          <span class="label">콤보</span>
+          <span class="value" id="comboVal">0</span>
+        </div>
+      </div>
+
+      <div class="question-card">
+        <div class="question" id="questionText">- - -</div>
+        <input type="text" class="answer-input" id="answerInput" inputmode="numeric" autocomplete="off" placeholder="?">
+        <div class="feedback" id="feedback"></div>
+      </div>
+    </section>
+
+    <!-- 결과 -->
+    <section class="math-result" id="resultScreen">
+      <h2 style="font-family:'Press Start 2P', cursive; color: var(--neon-purple);">결과</h2>
+      <div class="grade-badge" id="gradeBadge">-</div>
+      <div class="result-stats">
+        <span>정답 수</span>
+        <span class="big" id="finalScore">0</span>
+        <span>정답률 <span id="accuracy">0%</span></span>
+      </div>
+      <div class="new-record" id="newRecord" style="display:none;">🎉 신기록!</div>
+      <div class="result-buttons">
+        <button class="btn-primary" id="retryBtn">다시하기</button>
+        <a href="../index.html" class="btn-secondary">홈으로</a>
+      </div>
+    </section>
+  </main>
+
+  <div class="combo-floater" id="comboFloater"></div>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function() {
+      const introScreen = document.getElementById('introScreen');
+      const playScreen = document.getElementById('playScreen');
+      const resultScreen = document.getElementById('resultScreen');
+      const startBtn = document.getElementById('startBtn');
+      const retryBtn = document.getElementById('retryBtn');
+      const timerVal = document.getElementById('timerVal');
+      const timerBox = document.getElementById('timerBox');
+      const scoreVal = document.getElementById('scoreVal');
+      const comboVal = document.getElementById('comboVal');
+      const questionText = document.getElementById('questionText');
+      const answerInput = document.getElementById('answerInput');
+      const feedback = document.getElementById('feedback');
+      const introBest = document.getElementById('introBest');
+      const gradeBadge = document.getElementById('gradeBadge');
+      const finalScore = document.getElementById('finalScore');
+      const accuracy = document.getElementById('accuracy');
+      const newRecord = document.getElementById('newRecord');
+      const comboFloater = document.getElementById('comboFloater');
+
+      let timeLeft = 60;
+      let score = 0;
+      let combo = 0;
+      let totalAttempts = 0;
+      let correctAnswer = 0;
+      let timerId = null;
+
+      function showScreen(target) {
+        [introScreen, playScreen, resultScreen].forEach(s => s.classList.remove('active'));
+        target.classList.add('active');
+      }
+
+      function loadBest() {
+        const best = parseInt(localStorage.getItem('pixelfun_math_best') || '0', 10);
+        introBest.textContent = `최고 기록: ${best}`;
+        return best;
+      }
+
+      function randInt(min, max) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      function generateQuestion() {
+        const ops = ['+', '-', '×', '÷'];
+        const op = ops[randInt(0, 3)];
+        let a, b, ans, text;
+        if (op === '+') {
+          a = randInt(1, 50); b = randInt(1, 50);
+          ans = a + b;
+          text = `${a} + ${b}`;
+        } else if (op === '-') {
+          a = randInt(1, 50); b = randInt(1, 50);
+          if (b > a) [a, b] = [b, a];
+          ans = a - b;
+          text = `${a} - ${b}`;
+        } else if (op === '×') {
+          a = randInt(2, 12); b = randInt(2, 12);
+          ans = a * b;
+          text = `${a} × ${b}`;
+        } else {
+          b = randInt(2, 12);
+          ans = randInt(2, 12);
+          a = b * ans;
+          text = `${a} ÷ ${b}`;
+        }
+        correctAnswer = ans;
+        questionText.textContent = text + ' = ?';
+      }
+
+      function showCombo(n) {
+        comboFloater.textContent = n + 'x COMBO!';
+        comboFloater.classList.add('show');
+        setTimeout(() => comboFloater.classList.remove('show'), 600);
+      }
+
+      function checkAnswer() {
+        const v = answerInput.value.trim();
+        if (v === '') return;
+        totalAttempts++;
+        const userVal = parseInt(v, 10);
+        if (userVal === correctAnswer) {
+          combo++;
+          let gained = 1;
+          if (combo >= 5) gained += Math.floor(combo / 5);
+          score += gained;
+          if (window.PixelSound) PixelSound.play('success');
+          answerInput.classList.add('correct');
+          feedback.textContent = '정답! +' + gained;
+          feedback.className = 'feedback correct';
+          if (combo >= 2) showCombo(combo);
+        } else {
+          combo = 0;
+          if (window.PixelSound) PixelSound.play('fail');
+          answerInput.classList.add('wrong');
+          feedback.textContent = '오답! 정답: ' + correctAnswer;
+          feedback.className = 'feedback wrong';
+        }
+        scoreVal.textContent = score;
+        comboVal.textContent = combo;
+
+        setTimeout(() => {
+          answerInput.classList.remove('correct', 'wrong');
+          answerInput.value = '';
+          feedback.textContent = '';
+          generateQuestion();
+          answerInput.focus();
+        }, 350);
+      }
+
+      function tick() {
+        timeLeft--;
+        timerVal.textContent = timeLeft;
+        if (timeLeft <= 5) timerBox.classList.add('warning');
+        if (timeLeft <= 0) endGame();
+      }
+
+      function getGrade(s) {
+        if (s >= 30) return 'S';
+        if (s >= 20) return 'A';
+        if (s >= 10) return 'B';
+        return 'C';
+      }
+
+      function startGame() {
+        timeLeft = 60;
+        score = 0;
+        combo = 0;
+        totalAttempts = 0;
+        timerVal.textContent = '60';
+        scoreVal.textContent = '0';
+        comboVal.textContent = '0';
+        timerBox.classList.remove('warning');
+        if (window.PixelSound) PixelSound.play('start');
+        showScreen(playScreen);
+        generateQuestion();
+        answerInput.value = '';
+        answerInput.focus();
+        timerId = setInterval(tick, 1000);
+      }
+
+      function endGame() {
+        clearInterval(timerId);
+        if (window.PixelSound) PixelSound.play('clear');
+        const best = parseInt(localStorage.getItem('pixelfun_math_best') || '0', 10);
+        const isNewRecord = score > best;
+        if (isNewRecord) localStorage.setItem('pixelfun_math_best', score);
+
+        const grade = getGrade(score);
+        gradeBadge.textContent = grade;
+        gradeBadge.className = 'grade-badge grade-' + grade;
+        finalScore.textContent = score;
+        const acc = totalAttempts === 0 ? 0 : Math.round((score / totalAttempts) * 100);
+        accuracy.textContent = acc + '%';
+        newRecord.style.display = isNewRecord ? 'block' : 'none';
+
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: { game: 'math', score: score, grade: grade, isNewRecord: isNewRecord }
+        }));
+        showScreen(resultScreen);
+      }
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+      answerInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          checkAnswer();
+        }
+      });
+
+      loadBest();
+    })();
+  </script>
+</body>
+</html>

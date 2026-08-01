@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>숫자 맞추기 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .number-game {
+      max-width: 480px;
+      margin: 0 auto;
+      text-align: center;
+      padding: 1.5rem;
+    }
+    .number-game h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      text-shadow: 0 0 12px var(--neon-purple);
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+    }
+    .intro-screen, .play-screen, .result-screen {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-purple);
+      border-radius: 12px;
+      padding: 2rem 1.5rem;
+      box-shadow: 0 0 20px rgba(123, 47, 247, 0.3);
+    }
+    .intro-screen p { color: var(--text-secondary); margin: 0.6rem 0; line-height: 1.6; }
+    .input-row {
+      display: flex;
+      gap: 0.5rem;
+      margin: 1.2rem 0;
+      justify-content: center;
+    }
+    .number-input {
+      flex: 1;
+      max-width: 200px;
+      padding: 0.8rem;
+      font-size: 1.2rem;
+      background: var(--bg-main);
+      border: 2px solid var(--neon-blue);
+      border-radius: 8px;
+      color: var(--text-primary);
+      text-align: center;
+      font-family: 'Press Start 2P', cursive;
+    }
+    .number-input:focus { outline: none; box-shadow: 0 0 12px var(--neon-blue); }
+    .hint-msg {
+      font-size: 1.3rem;
+      font-weight: 700;
+      margin: 1rem 0;
+      min-height: 2rem;
+      color: var(--neon-yellow);
+    }
+    .hint-msg.up { color: var(--neon-blue); }
+    .hint-msg.down { color: var(--neon-purple); }
+    .hint-msg.correct { color: var(--neon-green); text-shadow: 0 0 10px var(--neon-green); }
+    .hint-msg.error { color: var(--neon-red); }
+    .stats-row {
+      display: flex;
+      justify-content: space-around;
+      margin: 1rem 0;
+      color: var(--text-secondary);
+    }
+    .stats-row strong { color: var(--neon-yellow); display: block; font-size: 1.4rem; }
+    .history-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+      justify-content: center;
+      margin-top: 1rem;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    .history-item {
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: var(--bg-hover);
+      color: var(--text-primary);
+      border: 1px solid var(--neon-blue);
+    }
+    .new-record {
+      color: var(--neon-yellow);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 1rem;
+      margin: 1rem 0;
+      animation: blink 1s infinite;
+    }
+    @keyframes blink { 50% { opacity: 0.5; } }
+    .button-row { display: flex; gap: 0.6rem; justify-content: center; margin-top: 1rem; flex-wrap: wrap; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">숫자 맞추기</span>
+  </nav>
+
+  <main class="game-container">
+    <div class="number-game">
+      <h1>NUMBER GUESS</h1>
+
+      <!-- 시작 화면 -->
+      <div id="introScreen" class="intro-screen">
+        <p>1~100 사이의 숫자를 맞춰보세요!</p>
+        <p>입력할 때마다 더 크다/작다 힌트를 드려요.</p>
+        <p>최소 시도횟수로 정답을 맞춰보세요.</p>
+        <p>최고기록: <strong id="bestRecord" style="color:var(--neon-yellow)">-</strong> 회</p>
+        <button class="btn-primary" id="startBtn">게임 시작</button>
+      </div>
+
+      <!-- 플레이 화면 -->
+      <div id="playScreen" class="play-screen hidden">
+        <div class="stats-row">
+          <div>시도 횟수<strong id="tryCount">0</strong></div>
+          <div>범위<strong id="rangeView">1 ~ 100</strong></div>
+        </div>
+        <div class="hint-msg" id="hintMsg">숫자를 입력하세요</div>
+        <div class="input-row">
+          <input type="number" id="numberInput" class="number-input" min="1" max="100" placeholder="?">
+          <button class="btn-primary" id="submitBtn">확인</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+      <!-- 결과 화면 -->
+      <div id="resultScreen" class="result-screen hidden">
+        <div class="hint-msg correct">🎉 정답입니다!</div>
+        <p style="color:var(--text-secondary)">정답 숫자: <strong style="color:var(--neon-yellow)" id="answerView">?</strong></p>
+        <p style="color:var(--text-secondary); margin-top:0.5rem">시도 횟수: <strong style="color:var(--neon-blue)" id="finalTries">0</strong> 회</p>
+        <div id="newRecordMsg" class="new-record hidden">🏆 신기록 달성!</div>
+        <p style="color:var(--text-secondary); margin-top:0.8rem">최고기록: <strong style="color:var(--neon-yellow)" id="finalBest">-</strong> 회</p>
+        <div class="button-row">
+          <button class="btn-primary" id="retryBtn">다시하기</button>
+          <a href="../index.html" class="btn-secondary">홈으로</a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function() {
+      const STORAGE_KEY = 'pixelfun_number_best';
+      let answer = 0;
+      let tries = 0;
+      let lo = 1, hi = 100;
+      let history = [];
+
+      const introScreen = document.getElementById('introScreen');
+      const playScreen = document.getElementById('playScreen');
+      const resultScreen = document.getElementById('resultScreen');
+      const startBtn = document.getElementById('startBtn');
+      const submitBtn = document.getElementById('submitBtn');
+      const retryBtn = document.getElementById('retryBtn');
+      const numberInput = document.getElementById('numberInput');
+      const tryCount = document.getElementById('tryCount');
+      const rangeView = document.getElementById('rangeView');
+      const hintMsg = document.getElementById('hintMsg');
+      const historyList = document.getElementById('historyList');
+      const bestRecord = document.getElementById('bestRecord');
+      const answerView = document.getElementById('answerView');
+      const finalTries = document.getElementById('finalTries');
+      const finalBest = document.getElementById('finalBest');
+      const newRecordMsg = document.getElementById('newRecordMsg');
+
+      function getBest() {
+        const v = localStorage.getItem(STORAGE_KEY);
+        return v ? parseInt(v, 10) : null;
+      }
+      function setBest(v) { localStorage.setItem(STORAGE_KEY, String(v)); }
+      function showBest() {
+        const b = getBest();
+        bestRecord.textContent = b ? b : '-';
+      }
+
+      function startGame() {
+        answer = Math.floor(Math.random() * 100) + 1;
+        tries = 0;
+        lo = 1; hi = 100;
+        history = [];
+        introScreen.classList.add('hidden');
+        resultScreen.classList.add('hidden');
+        playScreen.classList.remove('hidden');
+        tryCount.textContent = '0';
+        rangeView.textContent = '1 ~ 100';
+        hintMsg.textContent = '숫자를 입력하세요';
+        hintMsg.className = 'hint-msg';
+        historyList.innerHTML = '';
+        numberInput.value = '';
+        numberInput.focus();
+        if (window.PixelSound) PixelSound.play('start');
+      }
+
+      function submit() {
+        const val = parseInt(numberInput.value, 10);
+        if (isNaN(val) || val < 1 || val > 100) {
+          hintMsg.textContent = '1~100 숫자를 입력해주세요';
+          hintMsg.className = 'hint-msg error';
+          if (window.PixelSound) PixelSound.play('fail');
+          return;
+        }
+        tries++;
+        tryCount.textContent = tries;
+        history.push(val);
+
+        const item = document.createElement('span');
+        item.className = 'history-item';
+        item.textContent = val;
+        historyList.appendChild(item);
+
+        if (val === answer) {
+          if (window.PixelSound) PixelSound.play('clear');
+          showResult();
+          return;
+        }
+        if (val < answer) {
+          if (val > lo) lo = val;
+          hintMsg.textContent = '⬆ 더 큰 수입니다!';
+          hintMsg.className = 'hint-msg up';
+        } else {
+          if (val < hi) hi = val;
+          hintMsg.textContent = '⬇ 더 작은 수입니다!';
+          hintMsg.className = 'hint-msg down';
+        }
+        rangeView.textContent = (lo+1) + ' ~ ' + (hi-1);
+        if (window.PixelSound) PixelSound.play('flip');
+        numberInput.value = '';
+        numberInput.focus();
+      }
+
+      function showResult() {
+        const best = getBest();
+        const isNewRecord = !best || tries < best;
+        if (isNewRecord) setBest(tries);
+        playScreen.classList.add('hidden');
+        resultScreen.classList.remove('hidden');
+        answerView.textContent = answer;
+        finalTries.textContent = tries;
+        finalBest.textContent = getBest();
+        newRecordMsg.classList.toggle('hidden', !isNewRecord);
+
+        window.dispatchEvent(new CustomEvent('gameComplete', {
+          detail: { game: 'number', score: tries, isNewRecord: isNewRecord }
+        }));
+      }
+
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+      submitBtn.addEventListener('click', submit);
+      numberInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') submit();
+      });
+      showBest();
+    })();
+  </script>
+</body>
+</html>

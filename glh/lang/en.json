@@ -1,0 +1,106 @@
+{
+  "brand": {
+    "name": "PIXELFUN",
+    "slogan": "Mini Games That Wake Up Your Brain",
+    "tagline": "Mini Games That Wake Up Your Brain"
+  },
+  "section": {
+    "games": "Mini Games",
+    "features": "My Activity"
+  },
+  "ui": {
+    "best": "Best"
+  },
+  "features": {
+    "ranking": {
+      "title": "Ranking",
+      "desc": "Compete with players around the world."
+    },
+    "mypage": {
+      "title": "My Page",
+      "desc": "Check your play records and stats."
+    },
+    "badges": {
+      "title": "Badges",
+      "desc": "Achieve goals and collect badges."
+    }
+  },
+  "nav": {
+    "home": "Home",
+    "ranking": "Ranking",
+    "mypage": "My Page",
+    "badges": "Badges"
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "googleLogin": "Login with Google",
+    "guestStart": "Start as Guest",
+    "nickname": "Nickname",
+    "welcome": "Welcome, {name}!",
+    "loginFailed": "Login failed",
+    "guestModeOnly": "Guest mode only available",
+    "emailPlaceholder": "Enter your email",
+    "passwordPlaceholder": "Enter your password",
+    "nicknamePlaceholder": "Enter a nickname",
+    "or": "or",
+    "close": "Close",
+    "signupSuccess": "Sign up successful! Logging in automatically",
+    "logoutSuccess": "Logged out successfully",
+    "guestWelcome": "Starting in guest mode"
+  },
+  "game": {
+    "start": "Start Game",
+    "retry": "Retry",
+    "result": "Result",
+    "score": "Score",
+    "best": "Best",
+    "newRecord": "New Record!",
+    "time": "Time",
+    "combo": "Combo",
+    "grade": "Grade",
+    "playing": "Playing...",
+    "gameOver": "Game Over"
+  },
+  "games": {
+    "number": { "name": "Number Guess", "desc": "Guess a number between 1 and 100" },
+    "memory": { "name": "Memory Cards", "desc": "Find matching card pairs" },
+    "typing": { "name": "Typing Game", "desc": "Type fast for 60 seconds" },
+    "math": { "name": "Math Challenge", "desc": "Solve math in 60 seconds" },
+    "quiz": { "name": "OX Quiz", "desc": "True or false trivia" },
+    "color": { "name": "Color Match", "desc": "Stroop effect challenge" },
+    "chess": { "name": "Chess", "desc": "Play vs AI, win by checkmate" },
+    "tictactoe": { "name": "Tic-Tac-Toe", "desc": "Three in a row vs AI, build win streaks" }
+  },
+  "stats": {
+    "title": "My Stats",
+    "totalPlays": "Total Plays",
+    "firstPlay": "First Play",
+    "lastPlay": "Last Play",
+    "reset": "Reset"
+  },
+  "ranking": {
+    "title": "Leaderboard",
+    "rank": "Rank",
+    "player": "Player",
+    "score": "Score",
+    "noData": "No records yet",
+    "selectGame": "Select Game"
+  },
+  "badge": {
+    "title": "Badges",
+    "owned": "Owned",
+    "locked": "Locked",
+    "newBadge": "🎉 New Badge: {name}"
+  },
+  "sound": {
+    "on": "Sound On",
+    "off": "Sound Off"
+  },
+  "footer": {
+    "copy": "© 2026 PixelFun. All rights reserved."
+  }
+}

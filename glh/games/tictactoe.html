@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>틱택토 - PixelFun</title>
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../style.css">
+  <style>
+    .ttt-intro, .ttt-play, .ttt-result { display: none; }
+    .ttt-intro.active, .ttt-play.active, .ttt-result.active { display: block; }
+
+    .ttt-intro {
+      text-align: center;
+      padding: 40px 20px;
+    }
+    .ttt-intro h1 {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      font-size: 1.8rem;
+      margin-bottom: 24px;
+      text-shadow: 0 0 12px rgba(123, 47, 247, 0.7);
+    }
+    .ttt-intro p {
+      color: var(--text-secondary);
+      line-height: 1.8;
+      margin-bottom: 12px;
+    }
+    .ttt-best {
+      color: var(--neon-yellow);
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.9rem;
+      margin: 20px 0;
+    }
+
+    .difficulty-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 22px 0 18px;
+    }
+    .diff-btn {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.75rem;
+      padding: 12px 18px;
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 2px solid var(--neon-purple);
+      border-radius: var(--radius-btn);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    .diff-btn:hover { color: var(--neon-blue); box-shadow: 0 0 14px rgba(0, 212, 255, 0.4); }
+    .diff-btn.active {
+      background: var(--neon-purple);
+      color: #fff;
+      box-shadow: 0 0 20px rgba(123, 47, 247, 0.7);
+    }
+
+    .ttt-hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+    }
+    .hud-item {
+      background: var(--bg-card);
+      border: 2px solid var(--neon-purple);
+      border-radius: 12px;
+      padding: 12px 18px;
+      flex: 1;
+      min-width: 100px;
+      text-align: center;
+      box-shadow: 0 0 14px rgba(123, 47, 247, 0.25);
+    }
+    .hud-item .label {
+      display: block;
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+    .hud-item .value {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.2rem;
+    }
+    .hud-item.streak .value { color: var(--neon-green); }
+    .hud-item.turn .value { color: var(--neon-yellow); }
+
+    .ttt-board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      max-width: 360px;
+      margin: 0 auto 24px;
+    }
+    .ttt-cell {
+      aspect-ratio: 1 / 1;
+      background: var(--bg-card);
+      border: 3px solid var(--neon-purple);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 2.6rem;
+      color: var(--text-primary);
+      cursor: pointer;
+      transition: var(--transition);
+      user-select: none;
+      box-shadow: 0 0 12px rgba(123, 47, 247, 0.2);
+    }
+    .ttt-cell:hover:not(.filled):not(.locked) {
+      background: var(--bg-hover);
+      box-shadow: 0 0 18px rgba(0, 212, 255, 0.45);
+      transform: translateY(-3px);
+    }
+    .ttt-cell.filled { cursor: not-allowed; }
+    .ttt-cell.locked { cursor: not-allowed; }
+    .ttt-cell.x { color: var(--neon-blue); text-shadow: 0 0 12px var(--neon-blue); }
+    .ttt-cell.o { color: var(--neon-red); text-shadow: 0 0 12px var(--neon-red); }
+    .ttt-cell.win {
+      border-color: var(--neon-green);
+      box-shadow: 0 0 26px var(--neon-green);
+      animation: winPulse 0.8s ease-in-out infinite alternate;
+    }
+    @keyframes winPulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.06); }
+    }
+
+    .ttt-status {
+      text-align: center;
+      font-family: 'Press Start 2P', cursive;
+      font-size: 0.95rem;
+      min-height: 28px;
+      margin-bottom: 18px;
+      color: var(--neon-yellow);
+    }
+
+    .ttt-result {
+      text-align: center;
+      padding: 30px 20px;
+    }
+    .result-icon {
+      font-family: 'Press Start 2P', cursive;
+      font-size: 4rem;
+      margin: 20px 0 10px;
+    }
+    .result-icon.win { color: var(--neon-green); text-shadow: 0 0 24px var(--neon-green); }
+    .result-icon.lose { color: var(--neon-red); text-shadow: 0 0 24px var(--neon-red); }
+    .result-icon.draw { color: var(--neon-yellow); text-shadow: 0 0 24px var(--neon-yellow); }
+
+    .result-title {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-purple);
+      font-size: 1.2rem;
+      margin-bottom: 18px;
+    }
+    .result-stats {
+      margin: 18px 0;
+      color: var(--text-secondary);
+    }
+    .result-stats .big {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-blue);
+      font-size: 1.4rem;
+      display: block;
+      margin: 6px 0;
+    }
+    .new-record {
+      font-family: 'Press Start 2P', cursive;
+      color: var(--neon-yellow);
+      font-size: 1rem;
+      margin: 12px 0;
+      animation: pulse 1s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.1); }
+    }
+    .result-buttons {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 22px;
+    }
+
+    @media (max-width: 600px) {
+      .ttt-board { max-width: 280px; }
+      .ttt-cell { font-size: 2rem; }
+      .result-icon { font-size: 3rem; }
+    }
+  </style>
+</head>
+<body>
+  <nav class="game-nav">
+    <a href="../index.html">← 홈으로</a>
+    <span class="game-title">틱택토</span>
+  </nav>
+
+  <main class="game-container">
+    <section class="ttt-intro active" id="introScreen">
+      <h1>틱택토</h1>
+      <p>3 x 3 보드에서 AI와 대결!</p>
+      <p>당신은 <span style="color: var(--neon-blue);">X</span>, AI는 <span style="color: var(--neon-red);">O</span> 입니다.</p>
+      <p>가로/세로/대각선으로 3개를 먼저 잇는 쪽이 승리합니다.</p>
+
+      <div class="difficulty-row" id="diffRow">
+        <button class="diff-btn" data-diff="easy">쉬움</button>
+        <button class="diff-btn active" data-diff="normal">보통</button>
+        <button class="diff-btn" data-diff="hard">어려움</button>
+      </div>
+
+      <div style="color: var(--text-secondary); font-size: 0.85rem; margin-top: 8px;">선공 선택</div>
+      <div class="difficulty-row" id="firstRow">
+        <button class="diff-btn active" data-first="human">내가 먼저</button>
+        <button class="diff-btn" data-first="ai">AI가 먼저</button>
+        <button class="diff-btn" data-first="random">🎲 랜덤</button>
+      </div>
+
+      <div class="ttt-best" id="introBest">최고 연승: 0</div>
+      <button class="btn-primary" id="startBtn">게임 시작</button>
+    </section>
+
+    <section class="ttt-play" id="playScreen">
+      <div class="ttt-hud">
+        <div class="hud-item">
+          <span class="label">난이도</span>
+          <span class="value" id="diffVal">보통</span>
+        </div>
+        <div class="hud-item">
+          <span class="label">선공</span>
+          <span class="value" id="firstVal">당신</span>
+        </div>
+        <div class="hud-item streak">
+          <span class="label">현재 연승</span>
+          <span class="value" id="streakVal">0</span>
+        </div>
+        <div class="hud-item turn">
+          <span class="label">차례</span>
+          <span class="value" id="turnVal">당신</span>
+        </div>
+      </div>
+
+      <div class="ttt-status" id="statusText">당신의 차례 (X)</div>
+
+      <div class="ttt-board" id="board">
+        <div class="ttt-cell" data-i="0"></div>
+        <div class="ttt-cell" data-i="1"></div>
+        <div class="ttt-cell" data-i="2"></div>
+        <div class="ttt-cell" data-i="3"></div>
+        <div class="ttt-cell" data-i="4"></div>
+        <div class="ttt-cell" data-i="5"></div>
+        <div class="ttt-cell" data-i="6"></div>
+        <div class="ttt-cell" data-i="7"></div>
+        <div class="ttt-cell" data-i="8"></div>
+      </div>
+
+      <div style="text-align:center;">
+        <button class="btn-secondary" id="quitBtn">포기하기</button>
+      </div>
+    </section>
+
+    <section class="ttt-result" id="resultScreen">
+      <div class="result-icon" id="resultIcon">-</div>
+      <div class="result-title" id="resultTitle">결과</div>
+      <div class="result-stats">
+        <span>현재 연승</span>
+        <span class="big" id="finalStreak">0</span>
+        <span>최고 연승 <span id="bestStreak">0</span></span>
+      </div>
+      <div class="new-record" id="newRecord" style="display:none;">🎉 신기록!</div>
+      <div class="result-buttons">
+        <button class="btn-primary" id="retryBtn">다시하기</button>
+        <a href="../index.html" class="btn-secondary">홈으로</a>
+      </div>
+    </section>
+  </main>
+
+  <script src="../js/sound.js" defer></script>
+  <script src="../js/i18n.js" defer></script>
+  <script src="../js/stats.js" defer></script>
+  <script src="../js/badge.js" defer></script>
+  <script src="../js/ranking.js" defer></script>
+  <script>
+    (function() {
+      const HUMAN = 'X';
+      const AI = 'O';
+      const WIN_LINES = [
+        [0,1,2],[3,4,5],[6,7,8],
+        [0,3,6],[1,4,7],[2,5,8],
+        [0,4,8],[2,4,6]
+      ];
+
+      const introScreen = document.getElementById('introScreen');
+      const playScreen = document.getElementById('playScreen');
+      const resultScreen = document.getElementById('resultScreen');
+      const startBtn = document.getElementById('startBtn');
+      const retryBtn = document.getElementById('retryBtn');
+      const quitBtn = document.getElementById('quitBtn');
+      const boardEl = document.getElementById('board');
+      const cells = boardEl.querySelectorAll('.ttt-cell');
+      const statusText = document.getElementById('statusText');
+      const turnVal = document.getElementById('turnVal');
+      const streakVal = document.getElementById('streakVal');
+      const diffVal = document.getElementById('diffVal');
+      const firstVal = document.getElementById('firstVal');
+      const introBest = document.getElementById('introBest');
+      const diffRow = document.getElementById('diffRow');
+      const firstRow = document.getElementById('firstRow');
+      const resultIcon = document.getElementById('resultIcon');
+      const resultTitle = document.getElementById('resultTitle');
+      const finalStreak = document.getElementById('finalStreak');
+      const bestStreak = document.getElementById('bestStreak');
+      const newRecord = document.getElementById('newRecord');
+
+      const DIFF_NAME = { easy: '쉬움', normal: '보통', hard: '어려움' };
+      const FIRST_NAME = { human: '당신', ai: 'AI' };
+
+      let board = Array(9).fill(null);
+      let locked = false;
+      let difficulty = 'normal';
+      let firstChoice = 'human';   // 'human' | 'ai' | 'random'
+      let firstPlayer = 'human';   // 실제 적용된 선공자 (랜덤일 때 결정)
+      let currentStreak = 0;
+
+      function showScreen(target) {
+        [introScreen, playScreen, resultScreen].forEach(s => s.classList.remove('active'));
+        target.classList.add('active');
+      }
+
+      function loadBest() {
+        const best = parseInt(localStorage.getItem('pixelfun_tictactoe_best') || '0', 10);
+        introBest.textContent = `최고 연승: ${best}`;
+      }
+
+      function checkWinner(b) {
+        for (const line of WIN_LINES) {
+          const [a, c, d] = line;
+          if (b[a] && b[a] === b[c] && b[a] === b[d]) {
+            return { winner: b[a], line };
+          }
+        }
+        if (b.every(v => v !== null)) return { winner: 'draw', line: null };
+        return null;
+      }
+
+      function emptyIndices(b) {
+        const out = [];
+        for (let i = 0; i < 9; i++) if (b[i] === null) out.push(i);
+        return out;
+      }
+
+      // 미니맥스 (어려움)
+      function minimax(b, player) {
+        const res = checkWinner(b);
+        if (res) {
+          if (res.winner === AI) return { score: 10 };
+          if (res.winner === HUMAN) return { score: -10 };
+          return { score: 0 };
+        }
+        const moves = [];
+        for (const i of emptyIndices(b)) {
+          b[i] = player;
+          const next = minimax(b, player === AI ? HUMAN : AI);
+          moves.push({ index: i, score: next.score });
+          b[i] = null;
+        }
+        if (player === AI) {
+          let best = -Infinity, bestMove = moves[0];
+          for (const m of moves) if (m.score > best) { best = m.score; bestMove = m; }
+          return bestMove;
+        } else {
+          let best = Infinity, bestMove = moves[0];
+          for (const m of moves) if (m.score < best) { best = m.score; bestMove = m; }
+          return bestMove;
+        }
+      }
+
+      // 보통: 이길 수 있으면 이기고, 막을 수 있으면 막고, 아니면 랜덤
+      function smartMove(b) {
+        const empties = emptyIndices(b);
+        for (const i of empties) {
+          b[i] = AI;
+          if (checkWinner(b)?.winner === AI) { b[i] = null; return i; }
+          b[i] = null;
+        }
+        for (const i of empties) {
+          b[i] = HUMAN;
+          if (checkWinner(b)?.winner === HUMAN) { b[i] = null; return i; }
+          b[i] = null;
+        }
+        if (b[4] === null) return 4;
+        const corners = [0,2,6,8].filter(i => b[i] === null);
+        if (corners.length) return corners[Math.floor(Math.random() * corners.length)];
+        return empties[Math.floor(Math.random() * empties.length)];
+      }
+
+      function randomMove(b) {
+        const empties = emptyIndices(b);
+        return empties[Math.floor(Math.random() * empties.length)];
+      }
+
+      function aiPick() {
+        if (difficulty === 'easy') return randomMove(board);
+        if (difficulty === 'hard') {
+          // 너프: 20% 확률로 한 수 실수(랜덤) → 빈틈을 노리면 승리 가능
+          if (Math.random() < 0.2) return randomMove(board);
+          return minimax(board.slice(), AI).index;
+        }
+        return smartMove(board);
+      }
+
+      function paint() {
+        cells.forEach((cell, i) => {
+          const v = board[i];
+          cell.textContent = v || '';
+          cell.classList.remove('x', 'o', 'filled', 'win');
+          if (v === 'X') cell.classList.add('x', 'filled');
+          if (v === 'O') cell.classList.add('o', 'filled');
+        });
+      }
+
+      function highlightWin(line) {
+        if (!line) return;
+        line.forEach(i => cells[i].classList.add('win'));
+      }
+
+      function setLocked(v) {
+        locked = v;
+        cells.forEach(c => c.classList.toggle('locked', v));
+      }
+
+      function endGame(winner, line) {
+        setLocked(true);
+        highlightWin(line);
+
+        const best = parseInt(localStorage.getItem('pixelfun_tictactoe_best') || '0', 10);
+        let outcome, isNewRecord = false;
+
+        if (winner === HUMAN) {
+          const lostCells = board.filter(v => v === AI).length;
+          currentStreak++;
+          outcome = 'win';
+          if (window.PixelSound) PixelSound.play('clear');
+          resultIcon.textContent = 'WIN';
+          resultIcon.className = 'result-icon win';
+          resultTitle.textContent = '승리!';
+
+          if (currentStreak > best) {
+            localStorage.setItem('pixelfun_tictactoe_best', String(currentStreak));
+            isNewRecord = true;
+          }
+
+          window.dispatchEvent(new CustomEvent('gameComplete', {
+            detail: {
+              game: 'tictactoe',
+              score: currentStreak,
+              isNewRecord: isNewRecord,
+              outcome: 'win',
+              difficulty: difficulty,
+              firstPlayer: firstPlayer,
+              lost: lostCells
+            }
+          }));
+        } else if (winner === AI) {
+          currentStreak = 0;
+          outcome = 'lose';
+          if (window.PixelSound) PixelSound.play('fail');
+          resultIcon.textContent = 'LOSE';
+          resultIcon.className = 'result-icon lose';
+          resultTitle.textContent = '패배...';
+
+          window.dispatchEvent(new CustomEvent('gameComplete', {
+            detail: {
+              game: 'tictactoe',
+              score: 0,
+              isNewRecord: false,
+              outcome: 'lose',
+              difficulty: difficulty,
+              firstPlayer: firstPlayer
+            }
+          }));
+        } else {
+          outcome = 'draw';
+          if (window.PixelSound) PixelSound.play('flip');
+          resultIcon.textContent = 'DRAW';
+          resultIcon.className = 'result-icon draw';
+          resultTitle.textContent = '무승부';
+
+          window.dispatchEvent(new CustomEvent('gameComplete', {
+            detail: {
+              game: 'tictactoe',
+              score: currentStreak,
+              isNewRecord: false,
+              outcome: 'draw',
+              difficulty: difficulty,
+              firstPlayer: firstPlayer
+            }
+          }));
+        }
+
+        const updatedBest = Math.max(currentStreak, best, isNewRecord ? currentStreak : best);
+        finalStreak.textContent = currentStreak;
+        bestStreak.textContent = updatedBest;
+        newRecord.style.display = isNewRecord ? 'block' : 'none';
+        streakVal.textContent = currentStreak;
+        statusText.textContent = outcome === 'win' ? '당신의 승리!' :
+                                  outcome === 'lose' ? 'AI의 승리' : '무승부';
+
+        setTimeout(() => showScreen(resultScreen), 900);
+      }
+
+      function aiTurn() {
+        if (checkWinner(board)) return;
+        setLocked(true);
+        turnVal.textContent = 'AI';
+        statusText.textContent = 'AI가 생각 중...';
+        setTimeout(() => {
+          const i = aiPick();
+          if (i == null) return;
+          board[i] = AI;
+          if (window.PixelSound) PixelSound.play('flip');
+          paint();
+          const res = checkWinner(board);
+          if (res) return endGame(res.winner, res.line);
+          turnVal.textContent = '당신';
+          statusText.textContent = '당신의 차례 (X)';
+          setLocked(false);
+        }, 350);
+      }
+
+      function handleCellClick(e) {
+        if (locked) return;
+        const i = parseInt(e.currentTarget.getAttribute('data-i'), 10);
+        if (board[i] !== null) return;
+        board[i] = HUMAN;
+        if (window.PixelSound) PixelSound.play('success');
+        paint();
+        const res = checkWinner(board);
+        if (res) return endGame(res.winner, res.line);
+        aiTurn();
+      }
+
+      function startGame() {
+        board = Array(9).fill(null);
+        paint();
+        diffVal.textContent = DIFF_NAME[difficulty];
+        streakVal.textContent = currentStreak;
+
+        firstPlayer = firstChoice === 'random'
+          ? (Math.random() < 0.5 ? 'human' : 'ai')
+          : firstChoice;
+        firstVal.textContent = FIRST_NAME[firstPlayer];
+
+        if (window.PixelSound) PixelSound.play('start');
+        showScreen(playScreen);
+
+        if (firstPlayer === 'ai') {
+          turnVal.textContent = 'AI';
+          statusText.textContent = 'AI 선공!';
+          setLocked(true);
+          aiTurn();
+        } else {
+          turnVal.textContent = '당신';
+          statusText.textContent = '당신의 차례 (X)';
+          setLocked(false);
+        }
+      }
+
+      diffRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('.diff-btn');
+        if (!btn) return;
+        difficulty = btn.getAttribute('data-diff');
+        diffRow.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+
+      firstRow.addEventListener('click', (e) => {
+        const btn = e.target.closest('.diff-btn');
+        if (!btn) return;
+        firstChoice = btn.getAttribute('data-first');
+        firstRow.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+
+      cells.forEach(c => c.addEventListener('click', handleCellClick));
+      startBtn.addEventListener('click', startGame);
+      retryBtn.addEventListener('click', startGame);
+      quitBtn.addEventListener('click', () => {
+        currentStreak = 0;
+        streakVal.textContent = 0;
+        showScreen(introScreen);
+        loadBest();
+      });
+
+      loadBest();
+    })();
+  </script>
+</body>
+</html>
