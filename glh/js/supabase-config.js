@@ -16,8 +16,8 @@
 (function () {
   'use strict';
 
-  var SUPABASE_URL = 'YOUR_SUPABASE_URL';
-  var SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+  var SUPABASE_URL = 'https://cmxyzudgvucmbrsfcoba.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNteHl6dWRndnVjbWJyc2Zjb2JhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODU1NDA2NzMsImV4cCI6MjEwMTExNjY3M30.heCWZmf88JlStA0bwRvsV7nypSezF25UVHTH7M3vPpM';
 
   window.sb = null;
 
