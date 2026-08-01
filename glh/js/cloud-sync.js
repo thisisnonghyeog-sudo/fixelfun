@@ -316,6 +316,48 @@
     }, 1500);
   }
 
+  // ===== 초기화 =====
+  // 현재 프로필의 기록을 로컬과 서버 양쪽에서 완전히 지웁니다.
+  // 서버 행을 지우지 않으면 다시 로그인할 때 그대로 돌아옵니다.
+  function resetProfile() {
+    var scope = activeScope();
+    // 대기 중인 업로드가 지운 상태를 덮어쓰지 않도록 취소
+    if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+
+    clearWorking();
+    lsRemove(cacheKey(scope));
+    refreshUI();
+
+    var sb = getClient();
+    var uid = uidOfScope(scope);
+    if (!sb || !uid) return Promise.resolve(true);
+
+    return sb.from(TABLE).delete().eq('user_id', uid).then(function (res) {
+      if (res.error) throw res.error;
+      return true;
+    }).catch(function (err) {
+      console.warn('[PixelFun] 서버 기록 삭제 실패.', err && err.message);
+      return false;
+    });
+  }
+
+  // 이 브라우저에 남은 모든 프로필 보관함까지 비웁니다 (서버는 건드리지 않음).
+  function resetAllLocal() {
+    if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+    clearWorking();
+    try {
+      var doomed = [];
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (k && k.indexOf(CACHE_PREFIX) === 0) doomed.push(k);
+      }
+      doomed.forEach(lsRemove);
+    } catch (e) { /* 무시 */ }
+    lsRemove(SCOPE_KEY);
+    refreshUI();
+    return true;
+  }
+
   function init() {
     // 저장된 세션 확인이 끝난 뒤에 판단해야 합니다.
     // (그 전에는 로그인 상태여도 잠시 로그아웃으로 보입니다)
@@ -351,6 +393,8 @@
   window.PixelCloud = {
     sync: function () { return syncCloud(activeScope()); },
     persist: persist,
+    resetProfile: resetProfile,
+    resetAllLocal: resetAllLocal,
     getScope: activeScope,
     collect: collectWorking,
     mergeSnapshot: mergeSnapshot
