@@ -119,12 +119,13 @@
         🔊
       </button>
 
-      <!-- 로그인 (auth.js가 처리) -->
+      <!-- 로그인 (auth.js가 처리)
+           data-i18n을 쓰지 않습니다. 로그인하면 닉네임을 표시해야 하는데
+           i18n의 일괄 갱신이 "로그인"으로 덮어써 버립니다. -->
       <button
         id="loginBtn"
         class="btn-primary"
         type="button"
-        data-i18n="auth.login"
       >
         로그인
       </button>

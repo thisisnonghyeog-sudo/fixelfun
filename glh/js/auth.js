@@ -55,11 +55,7 @@
       'auth.logoutSuccess': '로그아웃되었습니다',
       'auth.guestWelcome': '게스트 모드로 시작합니다',
       'auth.loading': '처리 중...',
-      'auth.insecureContext': 'HTTPS 또는 localhost 에서만 로그인할 수 있습니다',
-      'auth.resetRecords': '🗑️ 이 계정 기록 초기화',
-      'auth.resetConfirm': '{name}의 통계·배지·최고기록을 모두 지웁니다.\n서버에 저장된 기록도 함께 삭제되며 되돌릴 수 없습니다.\n\n계속할까요?',
-      'auth.resetDone': '기록을 초기화했습니다',
-      'auth.resetPartial': '로컬 기록은 지웠지만 서버 삭제에 실패했습니다'
+      'auth.insecureContext': 'HTTPS 또는 localhost 에서만 로그인할 수 있습니다'
     };
     var s = fb[key] || key;
     if (vars) s = s.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] != null ? vars[k] : m; });
@@ -338,8 +334,7 @@
         '.pa-dropdown{position:absolute;background:var(--bg-card,#1a1a2e);border:1px solid var(--neon-purple,#7b2ff7);border-radius:8px;padding:6px;min-width:140px;z-index:9998;box-shadow:0 4px 14px rgba(0,0,0,.5);}',
         '.pa-dropdown .pa-dd-info{padding:6px 12px;font-size:12px;color:var(--text-secondary,#a0a0b0);border-bottom:1px solid #333;margin-bottom:4px;word-break:break-all;}',
         '.pa-dropdown button{width:100%;padding:8px 12px;background:none;border:none;color:var(--text-primary,#fff);text-align:left;cursor:pointer;border-radius:6px;font-family:inherit;font-size:13px;}',
-        '.pa-dropdown button:hover{background:var(--bg-hover,#16213e);}',
-        '.pa-dropdown button.pa-dd-danger{color:var(--neon-red,#ff4757);}'
+        '.pa-dropdown button:hover{background:var(--bg-hover,#16213e);}'
       ].join('\n');
       document.head.appendChild(s);
     } catch (e) { /* 무시 */ }
@@ -645,22 +640,8 @@
         dd.appendChild(info);
       }
 
-      // 이 계정(또는 게스트)의 기록만 초기화. 로컬 + 서버 양쪽을 지웁니다.
-      if (window.PixelCloud && typeof window.PixelCloud.resetProfile === 'function') {
-        var wipe = document.createElement('button');
-        wipe.className = 'pa-dd-danger';
-        wipe.textContent = tr('auth.resetRecords');
-        wipe.addEventListener('click', function () {
-          dd.remove();
-          var who = currentUser ? currentUser.displayName : '게스트';
-          if (!window.confirm(tr('auth.resetConfirm', { name: who }))) return;
-          window.PixelCloud.resetProfile().then(function (ok) {
-            showToast(ok ? tr('auth.resetDone') : tr('auth.resetPartial'));
-          });
-        });
-        dd.appendChild(wipe);
-      }
-
+      // 기록 초기화는 화면에 노출하지 않습니다.
+      // 필요하면 콘솔에서 PixelCloud.resetProfile() 을 호출하세요 (SETUP.md 참고).
       var out = document.createElement('button');
       out.textContent = tr('auth.logout');
       out.addEventListener('click', function () { logout(); dd.remove(); });

@@ -61,11 +61,7 @@
     "logoutSuccess": "Logged out successfully",
     "guestWelcome": "Starting in guest mode",
     "loading": "Processing...",
-    "insecureContext": "Login requires HTTPS or localhost",
-    "resetRecords": "🗑️ Reset this account's records",
-    "resetConfirm": "This deletes all stats, badges and best scores for {name}.\nThe server copy is deleted too and cannot be recovered.\n\nContinue?",
-    "resetDone": "Records have been reset",
-    "resetPartial": "Local records cleared, but the server delete failed"
+    "insecureContext": "Login requires HTTPS or localhost"
   },
   "game": {
     "start": "Start Game",

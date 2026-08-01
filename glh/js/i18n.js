@@ -202,6 +202,11 @@
       .then(function () {
         apply();
         bindToggle();
+        // 사전이 늦게 도착하므로, 직접 텍스트를 관리하는 모듈(auth.js 헤더 등)이
+        // 다시 그릴 수 있도록 최초 적용 후에도 알립니다.
+        try {
+          window.dispatchEvent(new CustomEvent('langChange', { detail: { lang: currentLang } }));
+        } catch (e) { /* 무시 */ }
       });
   }
 

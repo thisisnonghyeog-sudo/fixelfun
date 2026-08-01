@@ -174,13 +174,10 @@ python -m http.server 5500
 강력 새로고침해도 로그인하는 순간 서버에서 다시 내려받기 때문에 사라지지 않습니다.
 로컬이 아니라 **서버 기록을 지워야** 합니다.
 
-**방법 1 · 화면에서 (가장 쉬움)**
-로그인한 뒤 헤더의 닉네임 버튼 → **🗑️ 이 계정 기록 초기화**.
-로컬과 서버 양쪽을 함께 지웁니다. 게스트 상태에서 누르면 게스트 기록만 지워집니다.
+> 게스트 기록은 탭을 닫았다 열면 자동으로 초기화되므로 따로 지울 필요가 없습니다.
+> 아래는 **로그인 계정** 기록을 지우는 방법입니다.
 
-> 게스트 기록은 탭을 닫았다 열면 자동으로 초기화되므로 보통 따로 지울 필요가 없습니다.
-
-**방법 2 · 개발자 콘솔 (F12)**
+**방법 1 · 개발자 콘솔 (F12)**
 ```js
 // 현재 로그인한 계정의 기록만 (로컬 + 서버)
 await PixelCloud.resetProfile();
@@ -189,7 +186,7 @@ await PixelCloud.resetProfile();
 PixelCloud.resetAllLocal();
 ```
 
-**방법 3 · Supabase SQL Editor (전체 초기화)**
+**방법 2 · Supabase SQL Editor (전체 초기화)**
 ```sql
 -- 모든 계정의 통계/배지 기록 삭제
 delete from public.user_data;
@@ -197,7 +194,7 @@ delete from public.user_data;
 -- 리더보드까지 비우려면
 delete from public.rankings;
 ```
-지운 뒤 브라우저에서 방법 2의 `PixelCloud.resetAllLocal()` 도 함께 실행하세요.
+지운 뒤 브라우저에서 방법 1의 `PixelCloud.resetAllLocal()` 도 함께 실행하세요.
 로컬에 남은 사본이 다시 서버로 올라가는 것을 막습니다.
 
 ### 계정을 통째로 지우고 다시 가입하고 싶을 때
